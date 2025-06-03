@@ -8,15 +8,12 @@
 import SwiftUI
 import CoreData
 
-struct LibraryView: View {
+struct LoadingView: View {
     var body: some View {
-        NavigationView {
-            Text("This is the Library View")
-                .navigationTitle("Library")
-        }
+        Text("Loading...")
     }
 }
 
 #Preview {
-    LibraryView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    LoadingView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }
