@@ -15,7 +15,6 @@ class AppState: ObservableObject {
 
     init() {
         Task {
-            print("Started Loading")
             await loadInitialData()
         }
     }
@@ -24,7 +23,6 @@ class AppState: ObservableObject {
         do {
             let items = try await fetchShareableItems()
             self.shareableItems = items
-            print(items)
         } catch {
             print("Error fetching shareable item:", error)
         }
@@ -41,7 +39,7 @@ class AppState: ObservableObject {
     }}
 
 
-struct ShareableItem: Codable, Identifiable {
+struct ShareableItem: Codable, Identifiable, Equatable {
     let id: String
     let createdAt: String
     let title: String
@@ -62,12 +60,12 @@ struct ShareableItem: Codable, Identifiable {
         case mediaLinks = "media_links"
     }
 
-    struct Content: Codable {
+    struct Content: Codable, Equatable {
         let url: String
         let thumbnails: [String]
     }
 
-    struct MediaLinks: Codable {
+    struct MediaLinks: Codable, Equatable {
         let p144: String?
         let p240: String?
         let p360: String?
@@ -89,4 +87,5 @@ struct ShareableItem: Codable, Identifiable {
         }
     }
 }
+
 

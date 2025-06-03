@@ -6,47 +6,60 @@
 //
 
 import SwiftUI
-import CoreData
+import AVKit
+import AVFoundation
 
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var viewModel = VideoPlayerViewModel()
 
     var body: some View {
-        NavigationView {
+        ZStack {
             if appState.isLoading {
-                ProgressView("Loading...")
+                LoadingView()
+            } else if appState.shareableItems.isEmpty {
+                Text("No videos found")
             } else {
-                List(appState.shareableItems) { item in
-                    VStack(alignment: .leading) {
-                        Text(item.title).font(.headline)
-                        Text(item.summary).font(.subheadline)
-                        if let thumbnail = item.content.thumbnails.first,
-                           let url = URL(string: thumbnail) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .empty:
-                                    ProgressView()
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(height: 200)
-                                        .clipped()
-                                case .failure:
-                                    Color.gray
-                                @unknown default:
-                                    EmptyView()
+                VideoPlayerContainer(player: viewModel.player)
+                    .ignoresSafeArea(edges: [.top, .leading, .trailing])
+                    .gesture(
+                        DragGesture(minimumDistance: 50)
+                            .onEnded { val in
+                                if val.translation.height < 0 {
+                                    viewModel.previousVideo()
+                                    print("Swiped up")
+                                } else if val.translation.height > 0 {
+                                    viewModel.nextVideo()
+                                    print("Swiped down")  
                                 }
                             }
-                        }
+                    )
+                    .onTapGesture {
+                        viewModel.togglePlayPause()
                     }
-                    .padding(.vertical, 8)
+                    .onTapGesture(count: 2) {
+                        viewModel.toggleMute()
+                    }
+                if !viewModel.isPlaying {
+                    VStack {
+                        Spacer()
+                        Slider(value: $viewModel.currentTime, in: 0...viewModel.duration, onEditingChanged: { editing in
+                            if !editing {
+                                viewModel.seek(to: viewModel.currentTime)
+                            }
+                        })
+                        .padding()
+                    }
                 }
-                .navigationTitle("Library")
             }
+        }
+        .onChange(of: appState.shareableItems) { _, items in
+            let urls = items.compactMap { URL(string: $0.content.url) }
+            viewModel.setVideoURLs(urls)
         }
     }
 }
+
 
 #Preview {
     ContentView()

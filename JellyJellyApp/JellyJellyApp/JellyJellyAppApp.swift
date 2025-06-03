@@ -14,13 +14,9 @@ struct JellyJellyAppApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if appState.isLoading {
-                LoadingView()
-            } else {
-                ContentView()
-                    .environmentObject(appState)
-                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
-            }
+            ContentView()
+                .environmentObject(appState)
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
 
