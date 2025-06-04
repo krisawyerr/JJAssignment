@@ -93,6 +93,17 @@ class VideoPlayerViewModel: ObservableObject {
         player.seek(to: cmTime)
         currentTime = time
     }
+    
+    func stop() {
+        player.pause()
+        isPlaying = false
+        currentTime = 0
+    }
+    
+    func start() {
+        player.play()
+        isPlaying = true
+    }
 
     private func addPeriodicTimeObserver() {
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)

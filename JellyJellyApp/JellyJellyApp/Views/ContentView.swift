@@ -19,7 +19,7 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView()
+            HomeView(selectedTab: $selectedTab)
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Home")
@@ -33,7 +33,7 @@ struct ContentView: View {
                 }
                 .tag(Tab.create)
             
-            LibraryView()
+            LibraryView(selectedTab: $selectedTab)
                 .tabItem {
                     Image(systemName: "photo.fill")
                     Text("Library")

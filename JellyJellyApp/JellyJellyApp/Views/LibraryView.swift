@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import AVFoundation
 import AVKit
 
 struct LibraryView: View {
@@ -17,27 +18,77 @@ struct LibraryView: View {
         animation: .default)
     private var videos: FetchedResults<RecordedVideo>
 
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+
+    @State private var previewingURL: URL? = nil
+    @State private var navigationPath = NavigationPath()
+    
+    @Binding var selectedTab: Tab
+    @State private var previousTab: Tab = .home
+
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(videos, id: \.self) { recording in
-                    NavigationLink(destination: LibraryVideoPlayerView(
-                        mergedVideoPath: recording.mergedVideoURL ?? ""
-                    )) {
-                        Text("Video: \(recording.createdAt!, formatter: itemFormatter)")
+        NavigationStack(path: $navigationPath) {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(Array(videos.enumerated()), id: \.element) { index, recording in
+                        if let url = getVideoURL(from: recording.mergedVideoURL ?? "") {
+                            ZStack {
+                                if previewingURL == url {
+                                    InlineVideoPlayerView(url: url, onDisappear: {
+                                        previewingURL = nil
+                                    })
+                                        .frame(height: 200)
+                                        .cornerRadius(12)
+                                } else if let thumbnail = generateThumbnail(from: url) {
+                                    Button {
+                                        navigationPath.append(VideoNavigation(videos: Array(videos), currentIndex: index))
+                                    } label: {
+                                        Image(uiImage: thumbnail)
+                                            .resizable()
+                                            .aspectRatio(9/16, contentMode: .fill)
+                                            .frame(height: 200)
+                                            .clipped()
+                                            .cornerRadius(12)
+                                            .onLongPressGesture {
+                                                previewingURL = url
+                                            }
+                                    }
+                                }
+                            }
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(height: 200)
+                                .cornerRadius(12)
+                        }
                     }
                 }
+                .padding()
             }
             .navigationTitle("Saved Recordings")
+            .navigationDestination(for: VideoNavigation.self) { videoNav in
+                LibraryVideoPlayerView(
+                    videos: videoNav.videos,
+                    currentIndex: videoNav.currentIndex,
+                    selectedTab: $selectedTab
+                )
+            }
+        }
+        .onChange(of: selectedTab) { newTab in
+            if previousTab != newTab {
+                navigationPath = NavigationPath()
+            }
+            previousTab = newTab
+        }
+        .onAppear {
+            previousTab = selectedTab
         }
     }
-}
 
-struct LibraryVideoPlayerView: View {
-    let mergedVideoPath: String
-    @State private var player: AVPlayer?
-
-    private func url(for path: String) -> URL? {
+    private func getVideoURL(from path: String) -> URL? {
         guard let lastComponent = path.components(separatedBy: "/").last,
               let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             return nil
@@ -46,75 +97,17 @@ struct LibraryVideoPlayerView: View {
         return FileManager.default.fileExists(atPath: fullURL.path) ? fullURL : nil
     }
 
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                if let videoURL = url(for: mergedVideoPath) {
-                    LibraryVideoPlayerContainer(videoURL: videoURL)
-                } else {
-                    Text("Video not found")
-                        .foregroundColor(.white)
-                }
-            }
-        }
-        .edgesIgnoringSafeArea(.all)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
+    private func generateThumbnail(from url: URL) -> UIImage? {
+        let asset = AVAsset(url: url)
+        let imageGenerator = AVAssetImageGenerator(asset: asset)
+        imageGenerator.appliesPreferredTrackTransform = true
 
-struct LibraryVideoPlayerContainer: UIViewControllerRepresentable {
-    let videoURL: URL
-    private let player = AVPlayer()
-    
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        let playerItem = AVPlayerItem(url: videoURL)
-        player.replaceCurrentItem(with: playerItem)
-        controller.player = player
-        controller.showsPlaybackControls = false
-        controller.entersFullScreenWhenPlaybackBegins = true
-        controller.exitsFullScreenWhenPlaybackEnds = true
-        
-        NotificationCenter.default.addObserver(
-            context.coordinator,
-            selector: #selector(Coordinator.playerItemDidReachEnd(notification:)),
-            name: .AVPlayerItemDidPlayToEndTime,
-            object: player.currentItem)
-        
-        player.play()
-        
-        return controller
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(player: player)
-    }
-    
-    class Coordinator: NSObject {
-        var player: AVPlayer
-        
-        init(player: AVPlayer) {
-            self.player = player
-        }
-        
-        @objc func playerItemDidReachEnd(notification: Notification) {
-            player.seek(to: .zero)
-            player.play()
+        do {
+            let cgImage = try imageGenerator.copyCGImage(at: .zero, actualTime: nil)
+            return UIImage(cgImage: cgImage)
+        } catch {
+            print("❌ Thumbnail error: \(error.localizedDescription)")
+            return nil
         }
     }
-    
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-
-    }
-}
-
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
-
-#Preview {
-    LibraryView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

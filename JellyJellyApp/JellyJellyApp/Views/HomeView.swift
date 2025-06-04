@@ -11,6 +11,7 @@ import AVFoundation
 
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
+    @Binding var selectedTab: Tab
     @StateObject private var viewModel = VideoPlayerViewModel()
 
     var body: some View {
@@ -40,6 +41,12 @@ struct HomeView: View {
                     .onTapGesture(count: 2) {
                         viewModel.toggleMute()
                     }
+                    .onDisappear {
+                        DispatchQueue.main.async {
+                            viewModel.player.pause()
+                            viewModel.player.seek(to: .zero)
+                        }
+                    }
                 if !viewModel.isPlaying {
                     VStack {
                         Spacer()
@@ -51,6 +58,13 @@ struct HomeView: View {
                         .padding()
                     }
                 }
+            }
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab != .home {
+                viewModel.stop() 
+            } else {
+                viewModel.start()
             }
         }
         .onChange(of: appState.shareableItems) { _, items in

@@ -20,11 +20,14 @@ struct VideoPlayerContainer: UIViewControllerRepresentable {
 
         NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: player.currentItem,
+            object: nil,
             queue: .main
-        ) { _ in
-            player.seek(to: .zero)
-            player.play()
+        ) { notification in
+            if let playerItem = notification.object as? AVPlayerItem,
+               playerItem == player.currentItem {
+                player.seek(to: .zero)
+                player.play()
+            }
         }
 
         return controller
