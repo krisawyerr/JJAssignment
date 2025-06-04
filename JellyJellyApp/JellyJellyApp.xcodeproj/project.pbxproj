@@ -256,6 +256,8 @@
 				DEVELOPMENT_TEAM = RZ2V95M3Z3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Need access to both cameras for dual recording";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need access to microphone for video recording";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -285,6 +287,8 @@
 				DEVELOPMENT_TEAM = RZ2V95M3Z3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Need access to both cameras for dual recording";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need access to microphone for video recording";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

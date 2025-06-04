@@ -4,8 +4,10 @@
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
     </entity>
     <entity name="RecordedVideo" representedClassName="RecordedVideo" syncable="YES" codeGenerationType="class">
+        <attribute name="audioURL" optional="YES" attributeType="String"/>
         <attribute name="backVideoURL" optional="YES" attributeType="String"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="frontVideoURL" optional="YES" attributeType="String"/>
+        <attribute name="mergedVideoURL" optional="YES" attributeType="String"/>
     </entity>
 </model>

@@ -15,8 +15,11 @@ struct PersistenceController {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
         for _ in 0..<10 {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
+            let newItem = RecordedVideo(context: viewContext)
+            newItem.createdAt = Date().addingTimeInterval(-100000)
+            newItem.backVideoURL = "www.google.com"
+            newItem.frontVideoURL = "www.bing.com"
+            newItem.mergedVideoURL = "www.brave.com"
         }
         do {
             try viewContext.save()

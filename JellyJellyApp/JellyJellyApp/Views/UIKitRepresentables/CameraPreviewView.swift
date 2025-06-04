@@ -26,18 +26,14 @@ class CameraPreviewUIView: UIView {
     var backPreviewLayer: AVCaptureVideoPreviewLayer?
 
     func setupPreviewLayers(with session: AVCaptureMultiCamSession) {
-        // Clean up existing layers completely
         cleanupPreviewLayers()
 
-        // Create new preview layers using the "WithNoConnections" method
         frontPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
         backPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
 
-        // Configure the layers
         frontPreviewLayer?.videoGravity = .resizeAspectFill
         backPreviewLayer?.videoGravity = .resizeAspectFill
 
-        // Add connections manually for each camera
         setupConnections(for: session)
 
         if let frontLayer = frontPreviewLayer {
@@ -51,7 +47,6 @@ class CameraPreviewUIView: UIView {
     }
 
     private func setupConnections(for session: AVCaptureMultiCamSession) {
-        // Find the front and back camera inputs
         let inputs = session.inputs.compactMap { $0 as? AVCaptureDeviceInput }
 
         for input in inputs {

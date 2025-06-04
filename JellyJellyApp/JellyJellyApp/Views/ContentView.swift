@@ -8,30 +8,40 @@
 import SwiftUI
 import CoreData
 
+enum Tab {
+    case home
+    case create
+    case library
+}
+
 struct ContentView: View {
+    @State private var selectedTab: Tab = .home
+    
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             HomeView()
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Home")
                 }
+                .tag(Tab.home)
 
-            CreateView()
+            CreateView(selectedTab: $selectedTab)
                 .tabItem {
                     Image(systemName: "camera.fill")
                     Text("Create")
                 }
+                .tag(Tab.create)
             
             LibraryView()
                 .tabItem {
                     Image(systemName: "photo.fill")
                     Text("Library")
                 }
+                .tag(Tab.library)
         }
     }
 }
-
 #Preview {
     ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }
