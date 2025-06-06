@@ -108,7 +108,7 @@ class VideoPlayerViewModel: ObservableObject {
     private func addPeriodicTimeObserver() {
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self = self, self.isPlaying == false else { return }
+            guard let self = self, self.isPlaying else { return }
             self.currentTime = time.seconds
         }
     }

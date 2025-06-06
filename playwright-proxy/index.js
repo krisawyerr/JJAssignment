@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const targetPageUrl = 'https://www.jellyjelly.com/feed'; 
+const targetPageUrl = 'https://www.jellyjelly.com/feed';
 const fetchUrlPrefix = 'https://cbtzdoasmkbbiwnyoxvz.supabase.co/rest/v1/shareable_data';
 
 app.get('/data', async (req, res) => {
@@ -12,12 +12,11 @@ app.get('/data', async (req, res) => {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  try {
-    let responseData = null;
+  let responseData = null;
 
+  try {
     page.on('requestfinished', async (request) => {
       const url = request.url();
-
       if (url.startsWith(fetchUrlPrefix)) {
         try {
           const response = await request.response();
@@ -30,25 +29,27 @@ app.get('/data', async (req, res) => {
       }
     });
 
-    await page.goto(targetPageUrl, { waitUntil: 'networkidle' });
+    await page.goto(targetPageUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
 
-    await page.waitForTimeout(2000);
-
-    await browser.close();
+    await page.waitForTimeout(3000);
 
     if (responseData) {
+      res.setHeader('Cache-Control', 'no-store');
       return res.json(responseData);
     } else {
       return res.status(500).json({ error: 'Fetch response not found' });
     }
-
   } catch (err) {
-    await browser.close();
     console.error('Error in handler:', err);
     return res.status(500).json({ error: err.message });
+  } finally {
+    await browser.close();
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });

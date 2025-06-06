@@ -73,8 +73,11 @@ struct LibraryView: View {
                 LibraryVideoPlayerView(
                     videos: videoNav.videos,
                     currentIndex: videoNav.currentIndex,
-                    selectedTab: $selectedTab
+                    selectedTab: $selectedTab,
+                    navigationPath: $navigationPath
                 )
+                .background(Color("Background"))
+                .navigationBarBackButtonHidden(true)
             }
         }
         .onChange(of: selectedTab) { newTab in

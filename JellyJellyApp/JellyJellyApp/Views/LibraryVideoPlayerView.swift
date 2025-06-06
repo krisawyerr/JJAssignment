@@ -2,112 +2,70 @@
 //  LibraryVideoPlayerView.swift
 //  JellyJellyApp
 //
-//  Created by Kris Sawyerr on 6/4/25.
+//  Created by Kris Sawyerr on 6/3/25.
 //
 
 import SwiftUI
+import AVFoundation
+import UIKit
+import Lottie
 
 struct LibraryVideoPlayerView: View {
     let videos: [RecordedVideo]
     @State private var currentIndex: Int
-    @StateObject private var viewModel = LibraryVideoPlayerViewModel()
     @Binding var selectedTab: Tab
+    @Binding var navigationPath: NavigationPath
     
-    init(videos: [RecordedVideo], currentIndex: Int, selectedTab: Binding<Tab>) {
-        self.videos = videos
-        self._currentIndex = State(initialValue: currentIndex)
-        self._selectedTab = selectedTab
-    }
-
-    private func url(for path: String) -> URL? {
-        guard let lastComponent = path.components(separatedBy: "/").last,
-              let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
+    init(videos: [RecordedVideo], currentIndex: Int, selectedTab: Binding<Tab>, navigationPath: Binding<NavigationPath>) {
+            self.videos = videos
+            self._currentIndex = State(initialValue: currentIndex)
+            self._selectedTab = selectedTab
+            self._navigationPath = navigationPath 
         }
-        let fullURL = documentsURL.appendingPathComponent(lastComponent)
-        return FileManager.default.fileExists(atPath: fullURL.path) ? fullURL : nil
-    }
     
-    private func nextVideo() {
-        if currentIndex < videos.count - 1 {
-            currentIndex += 1
-            loadCurrentVideo()
-        }
-    }
-    
-    private func previousVideo() {
-        if currentIndex > 0 {
-            currentIndex -= 1
-            loadCurrentVideo()
-        }
-    }
-    
-    private func loadCurrentVideo() {
-        guard currentIndex < videos.count,
-              let videoURL = url(for: videos[currentIndex].mergedVideoURL ?? "") else {
-            return
-        }
-        viewModel.loadVideo(url: videoURL)
-    }
-
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                if currentIndex < videos.count,
-                   let videoURL = url(for: videos[currentIndex].mergedVideoURL ?? "") {
-                    LibraryVideoPlayerContainer(
-                        videoURL: videoURL,
-                        player: viewModel.player
-                    )
-                    .gesture(
-                        DragGesture(minimumDistance: 50)
-                            .onEnded { value in
-                                if value.translation.height < 0 {
-                                    nextVideo()
-                                    
-                                    print("Swiped up - previous video")
-                                } else if value.translation.height > 0 {
-                                    previousVideo()
-                                    
-                                    print("Swiped down - next video")
+        ZStack {
+            GenericScrollerView(videoItems: videos, currentIndex: currentIndex)
+                .onAppear {
+                    setupAudioSession()
+                }
+                .cornerRadius(16)
+            
+            VStack {
+                        HStack {
+                            Button(action: {
+                                navigationPath.removeLast()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 18, weight: .medium))
+                                    Text("Back")
+                                        .font(.system(size: 16, weight: .medium))
                                 }
+                                .foregroundColor(.white)
                             }
-                    )
-                    .onTapGesture {
-                        viewModel.togglePlayPause()
+                            
+                            Spacer() 
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16) 
+                        
+                        Spacer() 
                     }
-                    .onTapGesture(count: 2) {
-                        viewModel.toggleMute()
-                    }
-                } else {
-                    Text("Video not found")
-                        .foregroundColor(.white)
-                }
-                
-                if !viewModel.isPlaying && viewModel.duration > 0 {
-                    VStack {
-                        Spacer()
-                        Slider(value: $viewModel.currentTime, in: 0...viewModel.duration, onEditingChanged: { editing in
-                            if !editing {
-                                viewModel.seek(to: viewModel.currentTime)
-                            }
-                        })
-                        .padding()
-                    }
-                }
-            }
         }
-        .onChange(of: selectedTab) { _, newTab in
-            if newTab != .library {
-                viewModel.stop()
-            } else {
-                viewModel.start()
-            }
-        }
-        .ignoresSafeArea(edges: [.top, .trailing, .leading])
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            loadCurrentVideo()
-        }
+        .safeAreaInset(edge: .top) { Spacer().frame(height: 0) }
+        .safeAreaInset(edge: .leading) { Spacer().frame(width: 8) }
+        .safeAreaInset(edge: .trailing) { Spacer().frame(width: 8) }
+        
     }
+    
+    private func setupAudioSession() {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay, .allowBluetooth])
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+}
+
+#Preview {
+    ContentView()
+        .environmentObject(AppState())
 }

@@ -11,9 +11,12 @@ import CoreData
 struct LoadingView: View {
     var body: some View {
         Text("Loading...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.green)
     }
 }
 
 #Preview {
-    LoadingView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    ContentView()
+        .environmentObject(AppState())
 }

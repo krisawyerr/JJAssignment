@@ -10,13 +10,12 @@ import SwiftUI
 @main
 struct JellyJellyAppApp: App {
     @StateObject var appState = AppState()
-    let persistenceController = PersistenceController.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environment(\.managedObjectContext, appState.viewContext)
         }
     }
 
