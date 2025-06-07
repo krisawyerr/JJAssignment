@@ -35,12 +35,16 @@ class LibraryVideoPlayerViewModel: ObservableObject {
         duration = 0
         isPlaying = false
         
-        playerItem.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
-            DispatchQueue.main.async {
-                let duration = playerItem.asset.duration
-                if duration.isValid && !duration.isIndefinite {
-                    self.duration = CMTimeGetSeconds(duration)
+        Task {
+            do {
+                let duration = try await playerItem.asset.load(.duration)
+                await MainActor.run {
+                    if duration.isValid && !duration.isIndefinite {
+                        self.duration = CMTimeGetSeconds(duration)
+                    }
                 }
+            } catch {
+                print("Failed to load duration: \(error)")
             }
         }
         

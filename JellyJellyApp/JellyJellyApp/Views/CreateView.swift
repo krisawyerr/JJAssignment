@@ -40,13 +40,13 @@ struct CreateView: View {
                                 
                                 JellyfishShape()
                                     .trim(from: 0, to: progress)
-                                    .stroke(Color("Primary"), lineWidth: 3)
+                                    .stroke(Color("JellyPrimary"), lineWidth: 3)
                                     .frame(width: 100, height: 80)
                                     .animation(.linear(duration: 0.1), value: progress)
                                 
                                 if !cameraController.isRecording {
                                     JellyfishShape()
-                                        .fill(Color("Primary").opacity(0.3))
+                                        .fill(Color("JellyPrimary").opacity(0.3))
                                         .frame(width: 100, height: 80)
                                 }
                             }

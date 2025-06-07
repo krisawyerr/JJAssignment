@@ -18,7 +18,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color("Primary")
+                Color("JellyPrimary")
                 
                 if let player = playerManager.player {
                     AVPlayerView(player: player)

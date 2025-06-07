@@ -171,10 +171,10 @@ class CameraController: NSObject, ObservableObject {
         secondsRemaining = maxRecordingTime
 
         let timestamp = Date().timeIntervalSince1970
-        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let tempDir = FileManager.default.temporaryDirectory
 
-        frontURL = docsDir.appendingPathComponent("front_\(timestamp).mov")
-        backURL = docsDir.appendingPathComponent("back_\(timestamp).mov")
+        frontURL = tempDir.appendingPathComponent("front_\(timestamp).mov")
+        backURL = tempDir.appendingPathComponent("back_\(timestamp).mov")
 
         DispatchQueue.main.async {
             self.isRecording = true
@@ -253,267 +253,239 @@ class CameraController: NSObject, ObservableObject {
         DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
             print("⏳ Starting video processing after delay...")
 
+            let tempDir = FileManager.default.temporaryDirectory
             let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let croppedFrontURL = docsDir.appendingPathComponent("cropped_front_\(Date().timeIntervalSince1970).mp4")
-            let croppedBackURL = docsDir.appendingPathComponent("cropped_back_\(Date().timeIntervalSince1970).mp4")
+            let croppedFrontURL = tempDir.appendingPathComponent("cropped_front_\(Date().timeIntervalSince1970).mp4")
+            let croppedBackURL = tempDir.appendingPathComponent("cropped_back_\(Date().timeIntervalSince1970).mp4")
 
             let dispatchGroup = DispatchGroup()
 
             print("✂️ Starting front video crop...")
             dispatchGroup.enter()
-            self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL) { success, error in
-                if success {
+            Task {
+                do {
+                    try await self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL)
                     print("✅ Front crop completed")
-                } else {
-                    print("❌ Front crop failed: \(error?.localizedDescription ?? "Unknown error")")
+                    dispatchGroup.leave()
+                } catch {
+                    print("❌ Front crop failed: \(error.localizedDescription)")
+                    dispatchGroup.leave()
                 }
-                dispatchGroup.leave()
             }
 
             print("✂️ Starting back video crop...")
             dispatchGroup.enter()
-            self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL) { success, error in
-                if success {
+            Task {
+                do {
+                    try await self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL)
                     print("✅ Back crop completed")
-                } else {
-                    print("❌ Back crop failed: \(error?.localizedDescription ?? "Unknown error")")
+                    dispatchGroup.leave()
+                } catch {
+                    print("❌ Back crop failed: \(error.localizedDescription)")
+                    dispatchGroup.leave()
                 }
-                dispatchGroup.leave()
             }
 
             dispatchGroup.notify(queue: .main) {
                 print("🔄 Both crops completed, starting merge...")
-                let mergedOutputURL = docsDir.appendingPathComponent("merged_\(Date().timeIntervalSince1970).mp4")
+                let mergedOutputURL = tempDir.appendingPathComponent("merged_\(Date().timeIntervalSince1970).mp4")
 
-                self.mergeVideosTopBottom(videoURL1: croppedFrontURL, videoURL2: croppedBackURL, outputURL: mergedOutputURL) { success, error in
-                    if success {
+                Task {
+                    do {
+                        try await self.mergeVideosTopBottom(videoURL1: croppedFrontURL, videoURL2: croppedBackURL, outputURL: mergedOutputURL)
                         print("✅ Video merge completed: \(mergedOutputURL)")
                         let finalMergedWithAudioURL = docsDir.appendingPathComponent("merged_with_audio_\(Date().timeIntervalSince1970).mp4")
 
                         print("🔊 Starting audio merge...")
-                        self.mergeVideosWithAudio(frontVideoURL: mergedOutputURL, frontAudioURL: frontURL, outputURL: finalMergedWithAudioURL) { audioSuccess in
-                            if audioSuccess {
-                                DispatchQueue.main.async {
-                                    print("✅ Final video with audio at \(finalMergedWithAudioURL)")
-                                    self.mergedVideoURL = finalMergedWithAudioURL
-
-                                    let newRecording = RecordedVideo(context: context)
-                                    newRecording.createdAt = Date()
-                                    newRecording.mergedVideoURL = finalMergedWithAudioURL.absoluteString
-                                    newRecording.frontVideoURL = frontURL.absoluteString
-                                    newRecording.backVideoURL = backURL.absoluteString
-
-                                    do {
-                                        try context.save()
-                                        print("📦 Saved to Core Data")
-                                        self.onVideoProcessed?()
-                                    } catch {
-                                        print("❌ Failed to save to Core Data: \(error.localizedDescription)")
-                                    }
-                                }
-                            } else {
-                                print("❌ Failed to merge with audio")
-                            }
+                        try await self.mergeVideosWithAudio(frontVideoURL: mergedOutputURL, frontAudioURL: frontURL, outputURL: finalMergedWithAudioURL)
+                        print("✅ Final video with audio at \(finalMergedWithAudioURL)")
+                        
+                        try? FileManager.default.removeItem(at: frontURL)
+                        try? FileManager.default.removeItem(at: backURL)
+                        try? FileManager.default.removeItem(at: croppedFrontURL)
+                        try? FileManager.default.removeItem(at: croppedBackURL)
+                        try? FileManager.default.removeItem(at: mergedOutputURL)
+                        
+                        await MainActor.run {
+                            self.mergedVideoURL = finalMergedWithAudioURL
                         }
-                    } else {
-                        print("❌ Merge failed: \(error?.localizedDescription ?? "Unknown error")")
+
+                        let newRecording = RecordedVideo(context: context)
+                        newRecording.createdAt = Date()
+                        newRecording.mergedVideoURL = finalMergedWithAudioURL.absoluteString
+                        newRecording.frontVideoURL = frontURL.absoluteString
+                        newRecording.backVideoURL = backURL.absoluteString
+
+                        do {
+                            try context.save()
+                            print("📦 Saved to Core Data")
+                            self.onVideoProcessed?()
+                        } catch {
+                            print("❌ Failed to save to Core Data: \(error.localizedDescription)")
+                        }
+                    } catch {
+                        print("❌ Merge failed: \(error.localizedDescription)")
                     }
                 }
             }
         }
     }
 
-    func cropToMiddleThird(inputURL: URL, outputURL: URL, completion: @escaping (Bool, Error?) -> Void) {
+    func cropToMiddleThird(inputURL: URL, outputURL: URL) async throws {
         let asset = AVURLAsset(url: inputURL)
-
-        asset.loadValuesAsynchronously(forKeys: ["tracks"]) {
-            var error: NSError?
-            let status = asset.statusOfValue(forKey: "tracks", error: &error)
-
-            guard status == .loaded else {
-                completion(false, error)
-                return
-            }
-
-            guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-                completion(false, NSError(domain: "No video track found", code: -1))
-                return
-            }
-
-            let composition = AVMutableComposition()
-            guard let compositionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-                completion(false, NSError(domain: "Track creation failed", code: -2))
-                return
-            }
-
-            do {
-                try compositionTrack.insertTimeRange(
-                    CMTimeRange(start: .zero, duration: asset.duration),
-                    of: videoTrack,
-                    at: .zero
-                )
-            } catch {
-                completion(false, error)
-                return
-            }
-
-            let naturalSize = videoTrack.naturalSize
-            let cropWidth = naturalSize.width / 2
-            let cropX = naturalSize.width / 4
-            let transform = CGAffineTransform(translationX: -cropX, y: 0)
-
-            let transformer = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionTrack)
-            transformer.setTransform(transform, at: .zero)
-
-            let instruction = AVMutableVideoCompositionInstruction()
-            instruction.timeRange = CMTimeRange(start: .zero, duration: asset.duration)
-            instruction.layerInstructions = [transformer]
-
-            let videoComposition = AVMutableVideoComposition()
-            videoComposition.instructions = [instruction]
-            videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
-            videoComposition.renderSize = CGSize(width: cropWidth, height: naturalSize.height)
-
-            guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
-                completion(false, NSError(domain: "Export session failed", code: -3))
-                return
-            }
-
-            export.outputURL = outputURL
-            export.outputFileType = .mp4
-            export.videoComposition = videoComposition
-            export.exportAsynchronously {
-                switch export.status {
-                case .completed:
-                    completion(true, nil)
-                case .failed, .cancelled:
-                    completion(false, export.error)
-                default:
-                    break
-                }
-            }
+        
+        let tracks = try await asset.loadTracks(withMediaType: .video)
+        guard let videoTrack = tracks.first else {
+            throw NSError(domain: "No video track found", code: -1)
+        }
+        
+        let composition = AVMutableComposition()
+        guard let compositionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw NSError(domain: "Track creation failed", code: -2)
+        }
+        
+        let duration = try await asset.load(.duration)
+        try compositionTrack.insertTimeRange(
+            CMTimeRange(start: .zero, duration: duration),
+            of: videoTrack,
+            at: .zero
+        )
+        
+        let naturalSize = try await videoTrack.load(.naturalSize)
+        let cropWidth = naturalSize.width / 2
+        let cropX = naturalSize.width / 4
+        let transform = CGAffineTransform(translationX: -cropX, y: 0)
+        
+        let transformer = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionTrack)
+        transformer.setTransform(transform, at: .zero)
+        
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
+        instruction.layerInstructions = [transformer]
+        
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.instructions = [instruction]
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.renderSize = CGSize(width: cropWidth, height: naturalSize.height)
+        
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw NSError(domain: "Export session failed", code: -3)
+        }
+        
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.videoComposition = videoComposition
+        
+        do {
+            try await exportSession.export(to: outputURL, as: .mp4)
+        } catch {
+            throw error
         }
     }
-
-    func mergeVideosTopBottom(videoURL1: URL, videoURL2: URL, outputURL: URL, completion: @escaping (Bool, Error?) -> Void) {
+    
+    func mergeVideosTopBottom(videoURL1: URL, videoURL2: URL, outputURL: URL) async throws {
         let asset1 = AVURLAsset(url: videoURL1)
         let asset2 = AVURLAsset(url: videoURL2)
-
+        
         let composition = AVMutableComposition()
         guard let track1 = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
-              let track2 = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
-              let assetTrack1 = asset1.tracks(withMediaType: .video).first,
-              let assetTrack2 = asset2.tracks(withMediaType: .video).first else {
-            completion(false, NSError(domain: "MergeError", code: -1, userInfo: nil))
-            return
+              let track2 = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw NSError(domain: "MergeError", code: -1)
         }
-
-        let timeRange = CMTimeRange(start: .zero, duration: min(asset1.duration, asset2.duration))
-
-        do {
-            try track1.insertTimeRange(timeRange, of: assetTrack1, at: .zero)
-            try track2.insertTimeRange(timeRange, of: assetTrack2, at: .zero)
-        } catch {
-            completion(false, error)
-            return
+        
+        let tracks1 = try await asset1.loadTracks(withMediaType: .video)
+        let tracks2 = try await asset2.loadTracks(withMediaType: .video)
+        
+        guard let assetTrack1 = tracks1.first,
+              let assetTrack2 = tracks2.first else {
+            throw NSError(domain: "MergeError", code: -1)
         }
-
-        let naturalSize = assetTrack1.naturalSize
+        
+        let duration1 = try await asset1.load(.duration)
+        let duration2 = try await asset2.load(.duration)
+        let timeRange = CMTimeRange(start: .zero, duration: min(duration1, duration2))
+        
+        try track1.insertTimeRange(timeRange, of: assetTrack1, at: .zero)
+        try track2.insertTimeRange(timeRange, of: assetTrack2, at: .zero)
+        
+        let naturalSize = try await assetTrack1.load(.naturalSize)
         let finalSize = CGSize(width: naturalSize.height, height: naturalSize.width * 2)
-
+        
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = timeRange
-
+        
         let videoWidth = naturalSize.width
         let videoHeight = naturalSize.height
-
+        
         let rotation = CGAffineTransform(rotationAngle: .pi / 2)
         let move1 = CGAffineTransform(translationX: videoHeight, y: 0)
         let move2 = CGAffineTransform(translationX: videoHeight, y: videoWidth)
-
+        
         let transform1 = rotation.concatenating(move1)
         let transform2 = rotation.concatenating(move2)
-
+        
         let layerInstruction1 = AVMutableVideoCompositionLayerInstruction(assetTrack: track1)
         layerInstruction1.setTransform(transform1, at: .zero)
-
+        
         let layerInstruction2 = AVMutableVideoCompositionLayerInstruction(assetTrack: track2)
         layerInstruction2.setTransform(transform2, at: .zero)
-
+        
         instruction.layerInstructions = [layerInstruction1, layerInstruction2]
-
+        
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = finalSize
         videoComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
         videoComposition.instructions = [instruction]
-
+        
         guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
-            completion(false, NSError(domain: "ExportError", code: -2, userInfo: nil))
-            return
+            throw NSError(domain: "ExportError", code: -2)
         }
-
+        
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.videoComposition = videoComposition
         exportSession.shouldOptimizeForNetworkUse = true
-
-        exportSession.exportAsynchronously {
-            switch exportSession.status {
-            case .completed:
-                completion(true, nil)
-            case .failed, .cancelled:
-                completion(false, exportSession.error)
-            default:
-                break
-            }
+        
+        do {
+            try await exportSession.export(to: outputURL, as: .mp4)
+        } catch {
+            throw error
         }
     }
-
-    func mergeVideosWithAudio(frontVideoURL: URL, frontAudioURL: URL, outputURL: URL, completion: @escaping (Bool) -> Void) {
+    
+    func mergeVideosWithAudio(frontVideoURL: URL, frontAudioURL: URL, outputURL: URL) async throws {
         let mixComposition = AVMutableComposition()
-
-        let videoAsset = AVAsset(url: frontVideoURL)
-        let audioAsset = AVAsset(url: frontAudioURL)
-
-        guard let videoTrack = videoAsset.tracks(withMediaType: .video).first else {
-            completion(false)
-            return
+        
+        let videoAsset = AVURLAsset(url: frontVideoURL)
+        let audioAsset = AVURLAsset(url: frontAudioURL)
+        
+        let videoTracks = try await videoAsset.loadTracks(withMediaType: .video)
+        let audioTracks = try await audioAsset.loadTracks(withMediaType: .audio)
+        
+        guard let videoTrack = videoTracks.first,
+              let audioTrack = audioTracks.first else {
+            throw NSError(domain: "MergeError", code: -1)
         }
-
-        guard let audioTrack = audioAsset.tracks(withMediaType: .audio).first else {
-            completion(false)
-            return
-        }
-
+        
         let videoCompTrack = mixComposition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
-        do {
-            try videoCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoAsset.duration), of: videoTrack, at: .zero)
-        } catch {
-            completion(false)
-            return
-        }
-
         let audioCompTrack = mixComposition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-        do {
-            try audioCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoAsset.duration), of: audioTrack, at: .zero)
-        } catch {
-            completion(false)
-            return
-        }
-
+        
+        let videoDuration = try await videoAsset.load(.duration)
+        try videoCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero)
+        try audioCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: audioTrack, at: .zero)
+        
         guard let exportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPresetHighestQuality) else {
-            completion(false)
-            return
+            throw NSError(domain: "ExportError", code: -2)
         }
-
+        
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.shouldOptimizeForNetworkUse = true
-
-        exportSession.exportAsynchronously {
-            DispatchQueue.main.async {
-                completion(exportSession.status == .completed)
-            }
+        
+        do {
+            try await exportSession.export(to: outputURL, as: .mp4)
+        } catch {
+            throw error
         }
     }
 }

@@ -26,6 +26,7 @@ struct LibraryView: View {
 
     @State private var previewingURL: URL? = nil
     @State private var navigationPath = NavigationPath()
+    @State private var thumbnails: [URL: UIImage] = [:]
     
     @Binding var selectedTab: Tab
     @State private var previousTab: Tab = .home
@@ -43,19 +44,31 @@ struct LibraryView: View {
                                     })
                                         .frame(height: 200)
                                         .cornerRadius(5)
-                                } else if let thumbnail = generateThumbnail(from: url) {
+                                } else {
                                     Button {
                                         navigationPath.append(VideoNavigation(videos: Array(videos), currentIndex: index))
                                     } label: {
-                                        Image(uiImage: thumbnail)
-                                            .resizable()
-                                            .aspectRatio(9/16, contentMode: .fill)
-                                            .frame(height: 200)
-                                            .clipped()
-                                            .cornerRadius(5)
-                                            .onLongPressGesture {
-                                                previewingURL = url
-                                            }
+                                        if let thumbnail = thumbnails[url] {
+                                            Image(uiImage: thumbnail)
+                                                .resizable()
+                                                .aspectRatio(9/16, contentMode: .fill)
+                                                .frame(height: 200)
+                                                .clipped()
+                                                .cornerRadius(5)
+                                        } else {
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.3))
+                                                .frame(height: 200)
+                                                .cornerRadius(5)
+                                                .task {
+                                                    if let thumbnail = await generateThumbnail(from: url) {
+                                                        thumbnails[url] = thumbnail
+                                                    }
+                                                }
+                                        }
+                                    }
+                                    .onLongPressGesture {
+                                        previewingURL = url
                                     }
                                 }
                             }
@@ -128,13 +141,13 @@ struct LibraryView: View {
         return FileManager.default.fileExists(atPath: fullURL.path) ? fullURL : nil
     }
 
-    private func generateThumbnail(from url: URL) -> UIImage? {
+    private func generateThumbnail(from url: URL) async -> UIImage? {
         let asset = AVURLAsset(url: url)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         imageGenerator.appliesPreferredTrackTransform = true
-
+        
         do {
-            let cgImage = try imageGenerator.copyCGImage(at: .zero, actualTime: nil)
+            let cgImage = try await imageGenerator.image(at: .zero).image
             return UIImage(cgImage: cgImage)
         } catch {
             print("❌ Thumbnail error: \(error.localizedDescription)")

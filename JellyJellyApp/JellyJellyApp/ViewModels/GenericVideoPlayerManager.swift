@@ -183,13 +183,16 @@ class GenericVideoPlayerManager<T: VideoPlayable>: NSObject, ObservableObject {
     private func loadDuration() {
         guard let item = playerItem else { return }
         
-        item.asset.loadValuesAsynchronously(forKeys: ["duration"]) { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                let duration = item.asset.duration.seconds
-                if duration.isFinite && !duration.isNaN {
-                    self.duration = duration
+        Task {
+            do {
+                let duration = try await item.asset.load(.duration)
+                await MainActor.run {
+                    if duration.seconds.isFinite && !duration.seconds.isNaN {
+                        self.duration = duration.seconds
+                    }
                 }
+            } catch {
+                print("Failed to load duration: \(error)")
             }
         }
     }

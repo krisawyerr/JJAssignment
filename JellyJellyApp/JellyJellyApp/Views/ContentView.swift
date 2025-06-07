@@ -66,8 +66,8 @@ struct ContentView: View {
                             TabbarLottieView(
                                 animationName: "home",
                                 play: animateHome,
-                                strokeColor: (selectedTab == .home ? UIColor(named: "Primary") : UIColor(named: "Secondary"))!,
-                                fillColor: (selectedTab == .home ? UIColor(named: "Primary") : UIColor(named: "Secondary"))!
+                                strokeColor: (selectedTab == .home ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
+                                fillColor: (selectedTab == .home ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
                             )
                             .frame(width: 35, height: 35)
                         }
@@ -88,8 +88,8 @@ struct ContentView: View {
                             TabbarLottieView(
                                 animationName: "cam",
                                 play: animateCam,
-                                strokeColor: (selectedTab == .create ? UIColor(named: "Primary") : UIColor(named: "Secondary"))!,
-                                fillColor: (selectedTab == .create ? UIColor(named: "Primary") : UIColor(named: "Secondary"))!
+                                strokeColor: (selectedTab == .create ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
+                                fillColor: (selectedTab == .create ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
                             )
                             .frame(width: 35, height: 35)
                         }
@@ -110,8 +110,8 @@ struct ContentView: View {
                             TabbarLottieView(
                                 animationName: "gallery",
                                 play: animateGallery,
-                                strokeColor: (selectedTab == .library ? UIColor(named: "Primary") : UIColor(named: "Secondary"))!,
-                                fillColor: (selectedTab == .library ? UIColor(named: "Primary") : UIColor(named: "Secondary"))!
+                                strokeColor: (selectedTab == .library ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
+                                fillColor: (selectedTab == .library ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
                             )
                             .frame(width: 35, height: 35)
                         }

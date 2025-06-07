@@ -51,10 +51,14 @@ class VideoPlayerViewModel: ObservableObject {
         let item = AVPlayerItem(url: videoURLs[currentIndex])
         player.replaceCurrentItem(with: item)
 
-        player.currentItem?.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
-            DispatchQueue.main.async {
-                let duration = self.player.currentItem?.asset.duration.seconds ?? 1
-                self.duration = duration
+        Task {
+            do {
+                let duration = try await item.asset.load(.duration)
+                await MainActor.run {
+                    self.duration = duration.seconds
+                }
+            } catch {
+                print("Failed to load duration: \(error)")
             }
         }
 

@@ -10,13 +10,24 @@ import SwiftUI
 @main
 struct JellyJellyAppApp: App {
     @StateObject var appState = AppState()
+    @State private var isLoading = true
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(appState)
-                .environment(\.managedObjectContext, appState.viewContext)
+            if isLoading {
+                LaunchScreenView()
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                isLoading = false
+                            }
+                        }
+                    }
+            } else {
+                ContentView()
+                    .environmentObject(appState)
+                    .environment(\.managedObjectContext, appState.viewContext)
+            }
         }
     }
-
 }
