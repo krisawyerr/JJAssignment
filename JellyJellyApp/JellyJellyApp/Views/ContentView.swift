@@ -20,33 +20,35 @@ struct ContentView: View {
     @State private var animateHome = false
     @State private var animateCam = false
     @State private var animateGallery = false
+    @State private var isProcessingVideo = false
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            HomeView()
-                .tabItem {
-                    Image(systemName: "house.fill")
-                    Text("Home")
-                }
-                .tag(Tab.home)
-                .background(Color("Background"))
+        ZStack {
+            TabView(selection: $selectedTab) {
+                HomeView()
+                    .tabItem {
+                        Image(systemName: "house.fill")
+                        Text("Home")
+                    }
+                    .tag(Tab.home)
+                    .background(Color("Background"))
 
-            CreateView(selectedTab: $selectedTab)
-                .tabItem {
-                    Image(systemName: "camera.fill")
-                    Text("Create")
-                }
-                .tag(Tab.create)
-                .background(Color("Background"))
+                CreateView(selectedTab: $selectedTab, isProcessingVideo: $isProcessingVideo)
+                    .tabItem {
+                        Image(systemName: "camera.fill")
+                        Text("Create")
+                    }
+                    .tag(Tab.create)
+                    .background(Color("Background"))
+                
+                LibraryView(selectedTab: $selectedTab)
+                    .tabItem {
+                        Image(systemName: "photo.fill")
+                        Text("Library")
+                    }
+                    .tag(Tab.library)
+            }
             
-            LibraryView(selectedTab: $selectedTab)
-                .tabItem {
-                    Image(systemName: "photo.fill")
-                    Text("Library")
-                }
-                .tag(Tab.library)
-        }
-        .overlay(
             VStack {
                 Spacer()
                 HStack(alignment: .center) {
@@ -118,7 +120,22 @@ struct ContentView: View {
                 .padding(.top, 15)
                 .background(Color("Background"))
             }
-        )
+            
+            if isProcessingVideo {
+                Color.black.opacity(0.9)
+                    .ignoresSafeArea()
+                    .overlay(
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .scaleEffect(2)
+                                .tint(.white)
+                            Text("Processing video...")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                        }
+                    )
+            }
+        }
     }
 }
 

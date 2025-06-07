@@ -20,6 +20,7 @@ class CameraController: NSObject, ObservableObject {
     @Published var mergedVideoURL: URL?
     @Published var isRecording = false
     @Published var secondsRemaining = 15000
+    @Published var isPreviewReady = false
 
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
@@ -106,12 +107,16 @@ class CameraController: NSObject, ObservableObject {
 
             DispatchQueue.main.async {
                 self.previewView?.setupPreviewLayers(with: self.session)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.isPreviewReady = true
+                }
             }
         }
     }
 
     private func resetSession() {
         stopTimer()
+        isPreviewReady = false
 
         if isRecording {
             frontOutput.stopRecording()
