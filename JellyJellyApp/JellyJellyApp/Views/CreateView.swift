@@ -56,7 +56,7 @@ struct CreateView: View {
                         .padding(.bottom, 50)
                     }
                 } else {
-                    LoadingView()
+                    LoadingView(text: "setting up camera...")
                 }
             }
             .onAppear {

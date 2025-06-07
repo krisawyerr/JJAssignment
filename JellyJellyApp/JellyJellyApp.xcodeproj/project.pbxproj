@@ -14,9 +14,22 @@
 		600E4EE82DEF42AC00A193CE /* JellyJellyApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JellyJellyApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		608CD5122DF4976700A1036F /* Exceptions for "JellyJellyApp" folder in "JellyJellyApp" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 600E4EE72DEF42AC00A193CE /* JellyJellyApp */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		600E4EEA2DEF42AC00A193CE /* JellyJellyApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				608CD5122DF4976700A1036F /* Exceptions for "JellyJellyApp" folder in "JellyJellyApp" target */,
+			);
 			path = JellyJellyApp;
 			sourceTree = "<group>";
 		};
@@ -265,6 +278,7 @@
 				DEVELOPMENT_TEAM = RZ2V95M3Z3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JellyJellyApp/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Need access to both cameras for dual recording";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need access to microphone for video recording";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -296,6 +310,7 @@
 				DEVELOPMENT_TEAM = RZ2V95M3Z3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JellyJellyApp/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Need access to both cameras for dual recording";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need access to microphone for video recording";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

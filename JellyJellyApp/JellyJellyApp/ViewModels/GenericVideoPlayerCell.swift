@@ -18,7 +18,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.black
+                Color("Primary")
                 
                 if let player = playerManager.player {
                     AVPlayerView(player: player)
@@ -50,7 +50,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                 }
                 
                 if playerManager.isLoading {
-                    LoadingView()
+                    LoadingView(text: "jellies incoming...")
                 } else if playerManager.playerStatus == .failed {
                     VStack {
                         Image(systemName: "exclamationmark.triangle")

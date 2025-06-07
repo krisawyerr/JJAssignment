@@ -68,18 +68,26 @@ struct MuteLottieView: UIViewRepresentable {
             guard lottieView.animation != nil else { return }
             
             if isPlaying {
+                triggerHaptic(.soft)
                 if shouldReverse {
                     print("🔄 Playing animation in reverse")
-                    lottieView.play(fromProgress: 1.0, toProgress: 0.0)
+                    lottieView.play(fromProgress: 1.0, toProgress: 0.0, loopMode: .playOnce) { _ in
+                        lottieView.currentProgress = 0.0
+                    }
                 } else {
                     print("▶️ Playing animation forward")
-                    lottieView.play(fromProgress: 0.0, toProgress: 1.0)
+                    lottieView.play(fromProgress: 0.0, toProgress: 1.0, loopMode: .playOnce) { _ in
+                        lottieView.currentProgress = 1.0
+                    }
                 }
+            } else {
+                lottieView.stop()
+                lottieView.currentProgress = shouldReverse ? 0.0 : 1.0
             }
         } else if uiView.tag == 2, let imageView = uiView.subviews.first as? UIImageView {
             let symbolName = shouldReverse ? "speaker.fill" : "speaker.slash.fill"
             imageView.image = UIImage(systemName: symbolName)
-            imageView.tintColor = UIColor.white 
+            imageView.tintColor = UIColor.white
         }
     }
 }

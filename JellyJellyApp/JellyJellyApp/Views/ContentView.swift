@@ -56,6 +56,7 @@ struct ContentView: View {
 
                     VStack {
                         Button(action: {
+                            triggerHaptic(.soft)
                             selectedTab = .home
                             animateHome = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -77,6 +78,7 @@ struct ContentView: View {
 
                     VStack {
                         Button(action: {
+                            triggerHaptic(.soft)
                             selectedTab = .create
                             animateCam = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -98,6 +100,7 @@ struct ContentView: View {
 
                     VStack {
                         Button(action: {
+                            triggerHaptic(.soft)
                             selectedTab = .library
                             animateGallery = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -126,12 +129,14 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     .overlay(
                         VStack(spacing: 20) {
+                            Text("Processing video...")
+                                .font(.custom("Ranchers-Regular", size: 25))
+                                .foregroundColor(.white)
+                                .kerning(1.5)
+                                .padding(.bottom, 10)
                             ProgressView()
                                 .scaleEffect(2)
                                 .tint(.white)
-                            Text("Processing video...")
-                                .font(.title2)
-                                .foregroundColor(.white)
                         }
                     )
             }

@@ -69,7 +69,7 @@ struct LibraryView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Saved Recordings")
+            .navigationTitle("JellyRoll")
             .navigationDestination(for: VideoNavigation.self) { videoNav in
                 LibraryVideoPlayerView(
                     videos: videoNav.videos,
@@ -90,18 +90,33 @@ struct LibraryView: View {
         }
         .onAppear {
             previousTab = selectedTab
-            
+
             let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = UIColor(named: "Background")
-            appearance.titleTextAttributes = [.foregroundColor: UIColor(named: "Secondary")!]
-            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(named: "Secondary")!]
-            appearance.shadowColor = .clear
             
-            UINavigationBar.appearance().standardAppearance = appearance
-            UINavigationBar.appearance().scrollEdgeAppearance = appearance
-            UINavigationBar.appearance().compactAppearance = appearance
+            if let customFont = UIFont(name: "Ranchers-Regular", size: 30) {
+                appearance.largeTitleTextAttributes = [
+                    .font: customFont,
+                    .foregroundColor: UIColor.white,
+                    .kern: 2 
+                ]
+                appearance.titleTextAttributes = [
+                    .font: customFont,
+                    .foregroundColor: UIColor.white,
+                    .kern: 2
+                ]
+            } else {
+                print("⚠️ Font not found: Ranchers-Regular")
+            }
+
+            appearance.shadowColor = .clear
+
+            let navBar = UINavigationBar.appearance()
+            navBar.standardAppearance = appearance
+            navBar.scrollEdgeAppearance = appearance
+            navBar.compactAppearance = appearance
         }
-        
     }
 
     private func getVideoURL(from path: String) -> URL? {
@@ -127,3 +142,4 @@ struct LibraryView: View {
         }
     }
 }
+
