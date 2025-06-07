@@ -80,8 +80,6 @@ struct GenericScrollerView<T: VideoPlayable>: View {
             let manager = playerStore.getManager(for: item)
             manager.pause()
         }
-        
-        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
     }
     
     private func setupInitialVideo() {

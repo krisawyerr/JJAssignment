@@ -19,7 +19,7 @@ class CameraController: NSObject, ObservableObject {
     private var backURL: URL?
     @Published var mergedVideoURL: URL?
     @Published var isRecording = false
-    @Published var secondsRemaining = 15
+    @Published var secondsRemaining = 15000
 
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
@@ -29,7 +29,7 @@ class CameraController: NSObject, ObservableObject {
     private var isSessionSetup = false
 
     private var recordingTimer: Timer?
-    private let maxRecordingTime = 15
+    private let maxRecordingTime = 15000
 
     private var recordingCompletionCount = 0
     private var storedContext: NSManagedObjectContext?
@@ -200,11 +200,11 @@ class CameraController: NSObject, ObservableObject {
     }
 
     private func startTimer() {
-        recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { [weak self] _ in
             guard let self = self else { return }
 
             DispatchQueue.main.async {
-                self.secondsRemaining -= 1
+                self.secondsRemaining -= 10
 
                 if self.secondsRemaining <= 0 {
                     self.stopRecording()

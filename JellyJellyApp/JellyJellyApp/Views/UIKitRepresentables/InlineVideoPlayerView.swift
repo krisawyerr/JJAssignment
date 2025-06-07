@@ -14,7 +14,7 @@ struct InlineVideoPlayerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let player = AVPlayer(url: url)
-        player.isMuted = false
+        player.isMuted = true
         player.play()
 
         let controller = InlineAVPlayerViewController()

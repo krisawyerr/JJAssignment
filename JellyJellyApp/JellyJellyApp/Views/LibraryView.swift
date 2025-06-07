@@ -19,8 +19,9 @@ struct LibraryView: View {
     private var videos: FetchedResults<RecordedVideo>
 
     private let columns = [
-        GridItem(.flexible()),
-        GridItem(.flexible())
+        GridItem(.flexible(), spacing: 5),
+        GridItem(.flexible(), spacing: 5),
+        GridItem(.flexible(), spacing: 5)
     ]
 
     @State private var previewingURL: URL? = nil
@@ -31,8 +32,8 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
+            ScrollView(showsIndicators: false) {
+                LazyVGrid(columns: columns, spacing: 5) {
                     ForEach(Array(videos.enumerated()), id: \.element) { index, recording in
                         if let url = getVideoURL(from: recording.mergedVideoURL ?? "") {
                             ZStack {
@@ -41,7 +42,7 @@ struct LibraryView: View {
                                         previewingURL = nil
                                     })
                                         .frame(height: 200)
-                                        .cornerRadius(12)
+                                        .cornerRadius(5)
                                 } else if let thumbnail = generateThumbnail(from: url) {
                                     Button {
                                         navigationPath.append(VideoNavigation(videos: Array(videos), currentIndex: index))
@@ -51,7 +52,7 @@ struct LibraryView: View {
                                             .aspectRatio(9/16, contentMode: .fill)
                                             .frame(height: 200)
                                             .clipped()
-                                            .cornerRadius(12)
+                                            .cornerRadius(5)
                                             .onLongPressGesture {
                                                 previewingURL = url
                                             }
@@ -62,7 +63,7 @@ struct LibraryView: View {
                             Rectangle()
                                 .fill(Color.gray.opacity(0.3))
                                 .frame(height: 200)
-                                .cornerRadius(12)
+                                .cornerRadius(5)
                         }
                     }
                 }
@@ -76,11 +77,12 @@ struct LibraryView: View {
                     selectedTab: $selectedTab,
                     navigationPath: $navigationPath
                 )
-                .background(Color("Background"))
                 .navigationBarBackButtonHidden(true)
+                .background(Color("Background"))
             }
+            .background(Color("Background"))
         }
-        .onChange(of: selectedTab) { newTab in
+        .onChange(of: selectedTab) { _, newTab in
             if previousTab != newTab {
                 navigationPath = NavigationPath()
             }
@@ -88,7 +90,18 @@ struct LibraryView: View {
         }
         .onAppear {
             previousTab = selectedTab
+            
+            let appearance = UINavigationBarAppearance()
+            appearance.backgroundColor = UIColor(named: "Background")
+            appearance.titleTextAttributes = [.foregroundColor: UIColor(named: "Secondary")!]
+            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(named: "Secondary")!]
+            appearance.shadowColor = .clear
+            
+            UINavigationBar.appearance().standardAppearance = appearance
+            UINavigationBar.appearance().scrollEdgeAppearance = appearance
+            UINavigationBar.appearance().compactAppearance = appearance
         }
+        
     }
 
     private func getVideoURL(from path: String) -> URL? {
@@ -101,7 +114,7 @@ struct LibraryView: View {
     }
 
     private func generateThumbnail(from url: URL) -> UIImage? {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         imageGenerator.appliesPreferredTrackTransform = true
 

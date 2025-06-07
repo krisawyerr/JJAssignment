@@ -193,7 +193,7 @@ class GenericVideoPlayerManager<T: VideoPlayable>: NSObject, ObservableObject {
             }
         }
     }
-    
+
     func preload() {
         setupPlayerIfNeeded()
     }
