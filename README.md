@@ -35,10 +35,11 @@ I wanted to go back and fix a few small issues. I cleaned up the code and resolv
 I wasn’t sure if the app would be uploaded to TestFlight on time, so I decided to keep working on it and add more features.
 
 The first big thing I wanted to add was the ability to like videos. Basically, users can double tap or press the like button to save a shareable item to Core Data and then watch their liked videos in the Library alongside their personal ones. I implemented a few simple rules:
-
 - Like a video when it’s double tapped or the like button is pressed
 - Only allow unliking by pressing the like button (not double tapping)
 - Personal videos can’t be liked
 - Unliking is only allowed from the liked videos section
 
 I reused most of the layout from the personal videos section for this feature.
+
+The next thing I added was a way to delete and save videos. I added a button on each video cell that shows options to either delete or save the video. If you choose to delete, you'll be prompted to confirm first. If you save the video, a toast appears to let you know it was completed.

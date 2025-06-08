@@ -9,6 +9,7 @@ import SwiftUI
 import CoreData
 import AVFoundation
 import AVKit
+import Photos
 
 struct LibraryView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -34,6 +35,11 @@ struct LibraryView: View {
     @State private var navigationPath = NavigationPath()
     @State private var thumbnails: [URL: UIImage] = [:]
     @State private var selectedLibraryTab: LibraryTab = .myVideos
+    @State private var videoToDelete: RecordedVideo? = nil
+    @State private var showDeleteConfirmation = false
+    @State private var showPhotoLibraryPermissionAlert = false
+    @State private var isSavingVideo = false
+    @State private var showSaveSuccess = false
     
     @Binding var selectedTab: Tab
     @State private var previousTab: Tab = .home
@@ -55,7 +61,10 @@ struct LibraryView: View {
                                 videos: videos,
                                 thumbnails: $thumbnails,
                                 previewingURL: $previewingURL,
-                                navigationPath: $navigationPath
+                                navigationPath: $navigationPath,
+                                videoToDelete: $videoToDelete,
+                                showDeleteConfirmation: $showDeleteConfirmation,
+                                onSaveVideo: saveVideoToPhotos
                             )
                         } else {
                             LikedVideosGrid(
@@ -102,6 +111,59 @@ struct LibraryView: View {
             previousTab = selectedTab
             setupNavigationBarAppearance()
         }
+        .confirmationDialog(
+            "Delete Video",
+            isPresented: $showDeleteConfirmation,
+            presenting: videoToDelete
+        ) { video in
+            Button("Delete", role: .destructive) {
+                deleteVideo(video)
+            }
+            Button("Cancel", role: .cancel) {
+                videoToDelete = nil
+            }
+        } message: { video in
+            Text("Are you sure you want to delete this video? This action cannot be undone.")
+        }
+        .alert("Photo Library Access Required", isPresented: $showPhotoLibraryPermissionAlert) {
+            Button("Open Settings", role: .none) {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Please allow access to your photo library in Settings to save videos.")
+        }
+        .overlay {
+            if isSavingVideo {
+                ProgressView("Saving video...")
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .shadow(radius: 10)
+            }
+        }
+        .overlay {
+            if showSaveSuccess {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(Color("JellyPrimary"))
+                        Text("Video saved to Photos")
+                            .foregroundColor(.primary)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .shadow(radius: 10)
+                    .padding(.bottom, 50)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.easeInOut, value: showSaveSuccess)
+            }
+        }
     }
     
     private func setupNavigationBarAppearance() {
@@ -139,5 +201,57 @@ struct LibraryView: View {
         }
         let fullURL = documentsURL.appendingPathComponent(lastComponent)
         return FileManager.default.fileExists(atPath: fullURL.path) ? fullURL : nil
+    }
+
+    private func deleteVideo(_ video: RecordedVideo) {
+        if let videoURL = video.mergedVideoURL,
+           let lastComponent = videoURL.components(separatedBy: "/").last,
+           let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let fullURL = documentsURL.appendingPathComponent(lastComponent)
+            try? FileManager.default.removeItem(at: fullURL)
+        }
+        
+        viewContext.delete(video)
+        try? viewContext.save()
+    }
+
+    private func saveVideoToPhotos(_ video: RecordedVideo) {
+        guard let videoURL = video.mergedVideoURL,
+              let lastComponent = videoURL.components(separatedBy: "/").last,
+              let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+        
+        let fullURL = documentsURL.appendingPathComponent(lastComponent)
+        
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    isSavingVideo = true
+                    PHPhotoLibrary.shared().performChanges({
+                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fullURL)
+                    }) { success, error in
+                        DispatchQueue.main.async {
+                            isSavingVideo = false
+                            if success {
+                                showSaveSuccess = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    showSaveSuccess = false
+                                }
+                            } else if let error = error {
+                                print("Error saving video: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                case .denied, .restricted:
+                    showPhotoLibraryPermissionAlert = true
+                case .notDetermined:
+                    break
+                @unknown default:
+                    break
+                }
+            }
+        }
     }
 }

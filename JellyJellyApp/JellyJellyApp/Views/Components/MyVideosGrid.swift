@@ -12,17 +12,44 @@ struct MyVideosGrid: View {
     @Binding var thumbnails: [URL: UIImage]
     @Binding var previewingURL: URL?
     @Binding var navigationPath: NavigationPath
+    @Binding var videoToDelete: RecordedVideo?
+    @Binding var showDeleteConfirmation: Bool
+    var onSaveVideo: (RecordedVideo) -> Void
     
     var body: some View {
         ForEach(Array(videos.enumerated()), id: \.element) { index, recording in
-            VideoThumbnailView(
-                url: getVideoURL(from: recording.mergedVideoURL ?? ""),
-                thumbnails: $thumbnails,
-                previewingURL: $previewingURL,
-                onTap: {
-                    navigationPath.append(VideoNavigation(videos: Array(videos), currentIndex: index))
+            ZStack(alignment: .topTrailing) {
+                VideoThumbnailView(
+                    url: getVideoURL(from: recording.mergedVideoURL ?? ""),
+                    thumbnails: $thumbnails,
+                    previewingURL: $previewingURL,
+                    onTap: {
+                        navigationPath.append(VideoNavigation(videos: Array(videos), currentIndex: index))
+                    }
+                )
+                
+                Menu {
+                    Button(action: {
+                        onSaveVideo(recording)
+                    }) {
+                        Label("Save to Photos", systemImage: "arrow.down.circle")
+                    }
+                    
+                    Button(role: .destructive, action: {
+                        videoToDelete = recording
+                        showDeleteConfirmation = true
+                    }) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.black.opacity(0.5))
+                        .clipShape(Circle())
                 }
-            )
+                .padding(8)
+            }
         }
     }
     

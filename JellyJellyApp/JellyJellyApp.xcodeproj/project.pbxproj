@@ -283,6 +283,7 @@
 				INFOPLIST_FILE = JellyJellyApp/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Need access to both cameras for dual recording";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need access to microphone for video recording";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to allow you to upload and share photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -315,6 +316,7 @@
 				INFOPLIST_FILE = JellyJellyApp/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Need access to both cameras for dual recording";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need access to microphone for video recording";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to allow you to upload and share photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
