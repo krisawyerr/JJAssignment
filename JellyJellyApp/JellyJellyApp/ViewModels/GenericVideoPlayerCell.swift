@@ -57,12 +57,12 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                             VStack(spacing: 20) {
                                 if videoItem is ShareableItem || videoItem is LikedItem {
                                     Button(action: {
-                                        handleUnlike(method: "Button")
+                                        handleLike(method: "Button")
                                     }) {
                                         Image(systemName: videoItem is LikedItem || isLiked ? "heart.fill" : "heart")
                                             .resizable()
                                             .scaledToFit()
-                                            .frame(width: 22, height: 22)
+                                            .frame(width: 28, height: 28)
                                             .foregroundColor(videoItem is LikedItem || isLiked ? .red : .white)
                                     }
                                     .buttonStyle(PlainButtonStyle())
@@ -76,7 +76,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                                         isPlaying: $playerManager.shouldAnimateMute,
                                         shouldReverse: !playerManager.isMuted
                                     )
-                                    .frame(width: 40, height: 40)
+                                    .frame(width: 50, height: 50)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
@@ -136,17 +136,22 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
     private func handleLike(method: String) {
         guard let shareableItem = videoItem as? ShareableItem else { return }
         
-        if method == "Button" || (method == "Double Tap" && !isLiked) {
+        if isLiked {
+            handleUnlike(method: method)
+        } else if method == "Button" || (method == "Double Tap" && !isLiked) {
             appState.likeItem(shareableItem)
+            isLiked = true
         }
         
-        isLiked = method == "Button" ? !isLiked : true
-        showLikeAnimation = true
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            showLikeAnimation = false
+        if method == "Double Tap" {
+            showLikeAnimation = true
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                showLikeAnimation = false
+            }
         }
     }
+    
     private func handleUnlike(method: String) {
         guard method == "Button" else { return }
         
