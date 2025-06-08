@@ -5,11 +5,11 @@
 //  Created by Kris Sawyerr on 6/6/25.
 //
 
-struct ShareableItem: Codable, Identifiable, Equatable {
+struct ShareableItem: Codable, Identifiable, Equatable, Hashable {
     let id: String
     let createdAt: String
-    let title: String
-    let summary: String
+    let title: String?
+    let summary: String?
     let numLikes: Int
     let userId: String
     let content: Content
@@ -24,9 +24,17 @@ struct ShareableItem: Codable, Identifiable, Equatable {
         case content
     }
 
-    struct Content: Codable, Equatable {
+    struct Content: Codable, Equatable, Hashable {
         let url: String
         let thumbnails: [String]
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: ShareableItem, rhs: ShareableItem) -> Bool {
+        return lhs.id == rhs.id
     }
 }
 

@@ -30,3 +30,15 @@ Wrapping things up, I made the loading screen reusable and added the logo I crea
 
 ### Step Four: Final Touches
 I wanted to go back and fix a few small issues. I cleaned up the code and resolved all the errors. Then I created a simple launch screen to greet the user and help mask some of the waiting time for network calls. I also designed an app icon and connected it to the app. Finally, I went back to the CameraController and made it delete the temporary files like the original front and back camera videos so that only the final video is saved. Now I’m going to upload the app to TestFlight and wrap up the project.
+
+### Extra Change
+I wasn’t sure if the app would be uploaded to TestFlight on time, so I decided to keep working on it and add more features.
+
+The first big thing I wanted to add was the ability to like videos. Basically, users can double tap or press the like button to save a shareable item to Core Data and then watch their liked videos in the Library alongside their personal ones. I implemented a few simple rules:
+
+- Like a video when it’s double tapped or the like button is pressed
+- Only allow unliking by pressing the like button (not double tapping)
+- Personal videos can’t be liked
+- Unliking is only allowed from the liked videos section
+
+I reused most of the layout from the personal videos section for this feature.

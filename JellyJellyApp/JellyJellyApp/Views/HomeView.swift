@@ -12,6 +12,8 @@ import Lottie
 
 struct HomeView: View {
     @StateObject private var appState = AppState()
+    @State private var navigationPath = NavigationPath()
+    @State private var selectedTab: Tab = .home
     
     var body: some View {
         VStack {
@@ -19,7 +21,12 @@ struct HomeView: View {
                 if appState.shareableItems.isEmpty {
                     LoadingView(text: "jellies incoming...")
                 } else {
-                    GenericScrollerView(videoItems: appState.shareableItems, currentIndex: 0)
+                    GenericScrollerView(
+                        videoItems: appState.shareableItems,
+                        currentIndex: 0,
+                        navigationPath: $navigationPath,
+                        selectedTab: $selectedTab
+                    )
                 }
             }
             .onAppear {

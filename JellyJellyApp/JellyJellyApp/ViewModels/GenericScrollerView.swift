@@ -16,6 +16,8 @@ struct GenericScrollerView<T: VideoPlayable>: View {
     @State var currentIndex: Int
     @State private var dragOffset: CGFloat = 0
     @EnvironmentObject var appState: AppState
+    @Binding var navigationPath: NavigationPath
+    @Binding var selectedTab: Tab
     
     var body: some View {
         GeometryReader { geometry in
@@ -27,7 +29,9 @@ struct GenericScrollerView<T: VideoPlayable>: View {
                     GenericVideoPlayerCell(
                         videoItem: item,
                         isCurrentVideo: index == currentIndex,
-                        playerManager: playerStore.getManager(for: item)
+                        playerManager: playerStore.getManager(for: item),
+                        navigationPath: $navigationPath,
+                        selectedTab: $selectedTab
                     )
                     .frame(width: screenWidth, height: screenHeight)
                     .offset(y: CGFloat(index - currentIndex) * screenHeight + dragOffset)

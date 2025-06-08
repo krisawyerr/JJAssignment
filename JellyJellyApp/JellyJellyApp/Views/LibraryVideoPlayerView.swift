@@ -25,11 +25,16 @@ struct LibraryVideoPlayerView: View {
     
     var body: some View {
         ZStack {
-            GenericScrollerView(videoItems: videos, currentIndex: currentIndex)
-                .onAppear {
-                    setupAudioSession()
-                }
-                .cornerRadius(16)
+            GenericScrollerView(
+                videoItems: videos,
+                currentIndex: currentIndex,
+                navigationPath: $navigationPath,
+                selectedTab: $selectedTab
+            )
+            .onAppear {
+                setupAudioSession()
+            }
+            .cornerRadius(16)
             
             VStack {
                         HStack {

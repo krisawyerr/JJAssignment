@@ -1,0 +1,37 @@
+//
+//  MyVideosGrid.swift
+//  JellyJellyApp
+//
+//  Created by Kris Sawyerr on 6/8/25.
+//
+
+import SwiftUI
+
+struct MyVideosGrid: View {
+    let videos: FetchedResults<RecordedVideo>
+    @Binding var thumbnails: [URL: UIImage]
+    @Binding var previewingURL: URL?
+    @Binding var navigationPath: NavigationPath
+    
+    var body: some View {
+        ForEach(Array(videos.enumerated()), id: \.element) { index, recording in
+            VideoThumbnailView(
+                url: getVideoURL(from: recording.mergedVideoURL ?? ""),
+                thumbnails: $thumbnails,
+                previewingURL: $previewingURL,
+                onTap: {
+                    navigationPath.append(VideoNavigation(videos: Array(videos), currentIndex: index))
+                }
+            )
+        }
+    }
+    
+    private func getVideoURL(from path: String) -> URL? {
+        guard let lastComponent = path.components(separatedBy: "/").last,
+              let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let fullURL = documentsURL.appendingPathComponent(lastComponent)
+        return FileManager.default.fileExists(atPath: fullURL.path) ? fullURL : nil
+    }
+}

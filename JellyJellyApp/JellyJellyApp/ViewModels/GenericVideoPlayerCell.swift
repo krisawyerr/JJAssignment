@@ -14,6 +14,11 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
     let videoItem: T
     let isCurrentVideo: Bool
     @ObservedObject var playerManager: GenericVideoPlayerManager<T>
+    @State private var showLikeAnimation = false
+    @EnvironmentObject var appState: AppState
+    @State private var isLiked = false
+    @Binding var navigationPath: NavigationPath
+    @Binding var selectedTab: Tab
     
     var body: some View {
         GeometryReader { geometry in
@@ -26,6 +31,9 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                         .onTapGesture {
                             playerManager.togglePlayback()
                         }
+                        .onTapGesture(count: 2) {
+                            handleLike(method: "Double Tap")
+                        }
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))
@@ -36,30 +44,9 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                         .onTapGesture {
                             playerManager.togglePlayback()
                         }
-                }
-                
-                if !playerManager.isPlaying && !playerManager.isLoading && playerManager.playerStatus == .readyToPlay {
-                    Button(action: {
-                        playerManager.togglePlayback()
-                    }) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
-                if playerManager.isLoading {
-                    LoadingView(text: "jellies incoming...")
-                } else if playerManager.playerStatus == .failed {
-                    VStack {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundColor(.red)
-                        Text("Failed to load video")
-                            .foregroundColor(.white)
-                            .font(.caption)
-                    }
+                        .onTapGesture(count: 2) {
+                            handleLike(method: "Double Tap")
+                        }
                 }
                 
                 if !playerManager.isPlaying && !playerManager.isLoading && playerManager.playerStatus == .readyToPlay {
@@ -67,17 +54,32 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                         Spacer()
                         HStack {
                             Spacer()
-                            Button(action: {
-                                playerManager.toggleMute()
-                            }) {
-                                MuteLottieView(
-                                    animationName: "mute",
-                                    isPlaying: $playerManager.shouldAnimateMute,
-                                    shouldReverse: !playerManager.isMuted
-                                )
-                                .frame(width: 40, height: 40)
+                            VStack(spacing: 20) {
+                                if videoItem is ShareableItem || videoItem is LikedItem {
+                                    Button(action: {
+                                        handleUnlike(method: "Button")
+                                    }) {
+                                        Image(systemName: videoItem is LikedItem || isLiked ? "heart.fill" : "heart")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 22, height: 22)
+                                            .foregroundColor(videoItem is LikedItem || isLiked ? .red : .white)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                                
+                                Button(action: {
+                                    playerManager.toggleMute()
+                                }) {
+                                    MuteLottieView(
+                                        animationName: "mute",
+                                        isPlaying: $playerManager.shouldAnimateMute,
+                                        shouldReverse: !playerManager.isMuted
+                                    )
+                                    .frame(width: 40, height: 40)
+                                }
+                                .buttonStyle(PlainButtonStyle())
                             }
-                            .buttonStyle(PlainButtonStyle())
                             .padding(.trailing, 16)
                         }
                     }
@@ -100,6 +102,16 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                         .padding(.bottom, 20)
                     }
                 }
+                
+                if showLikeAnimation {
+                    TabbarLottieView(
+                        animationName: "heart",
+                        play: true,
+                        strokeColor: .red,
+                        fillColor: .red
+                    )
+                    .frame(width: 150, height: 150)
+                }
             }
         }
         .onChange(of: isCurrentVideo) { _, newValue in
@@ -115,6 +127,50 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                 playerManager.syncMuteState()
                 playerManager.play()
             }
+            if let shareableItem = videoItem as? ShareableItem {
+                isLiked = appState.isItemLiked(shareableItem.id)
+            }
         }
     }
+    
+    private func handleLike(method: String) {
+        guard let shareableItem = videoItem as? ShareableItem else { return }
+        
+        if method == "Button" || (method == "Double Tap" && !isLiked) {
+            appState.likeItem(shareableItem)
+        }
+        
+        isLiked = method == "Button" ? !isLiked : true
+        showLikeAnimation = true
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            showLikeAnimation = false
+        }
+    }
+    private func handleUnlike(method: String) {
+        guard method == "Button" else { return }
+        
+        if let likedItem = videoItem as? LikedItem {
+            let context = appState.viewContext
+            context.delete(likedItem)
+            
+            do {
+                try context.save()
+                isLiked = false
+                
+                navigationPath = NavigationPath()
+                selectedTab = .library
+            } catch {
+                print("Error removing liked item: \(error)")
+            }
+        } else if let shareableItem = videoItem as? ShareableItem {
+            appState.likeItem(shareableItem)
+            isLiked = false
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+        .environmentObject(AppState())
 }
