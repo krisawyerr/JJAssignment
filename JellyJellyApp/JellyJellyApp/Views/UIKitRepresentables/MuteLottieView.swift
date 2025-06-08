@@ -24,7 +24,6 @@ struct MuteLottieView: UIViewRepresentable {
         animationView.backgroundColor = UIColor.clear
         
         if animationView.animation != nil {
-            print("✅ Lottie animation '\(animationName)' loaded successfully")
             animationView.translatesAutoresizingMaskIntoConstraints = false
             containerView.addSubview(animationView)
             
@@ -40,9 +39,7 @@ struct MuteLottieView: UIViewRepresentable {
             ])
             
             containerView.tag = 1 
-        } else {
-            print("❌ Lottie animation '\(animationName)' failed to load - using fallback")
-            
+        } else {            
             let imageView = UIImageView()
             imageView.contentMode = .scaleAspectFit
             imageView.tintColor = UIColor.white 
@@ -70,12 +67,10 @@ struct MuteLottieView: UIViewRepresentable {
             if isPlaying {
                 triggerHaptic(.soft)
                 if shouldReverse {
-                    print("🔄 Playing animation in reverse")
                     lottieView.play(fromProgress: 1.0, toProgress: 0.0, loopMode: .playOnce) { _ in
                         lottieView.currentProgress = 0.0
                     }
                 } else {
-                    print("▶️ Playing animation forward")
                     lottieView.play(fromProgress: 0.0, toProgress: 1.0, loopMode: .playOnce) { _ in
                         lottieView.currentProgress = 1.0
                     }

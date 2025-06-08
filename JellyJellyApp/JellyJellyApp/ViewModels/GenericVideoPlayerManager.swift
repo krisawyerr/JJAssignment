@@ -117,7 +117,7 @@ class GenericVideoPlayerManager<T: VideoPlayable>: NSObject, ObservableObject {
         case .failed:
             isLoading = false
             if let error = playerItem?.error {
-                print("❌ Player failed with error: \(error.localizedDescription)")
+                print("Player failed with error: \(error.localizedDescription)")
             }
         case .unknown:
             isLoading = true

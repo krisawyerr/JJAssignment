@@ -224,35 +224,28 @@ class CameraController: NSObject, ObservableObject {
     }
 
     private func processVideos(context: NSManagedObjectContext) {
-        print("🎬 Starting processVideos...")
 
         guard let frontURL = self.frontURL,
               let backURL = self.backURL else {
-            print("❌ Missing video URLs")
             return
         }
 
-        print("📁 Front URL: \(frontURL)")
-        print("📁 Back URL: \(backURL)")
-
         guard FileManager.default.fileExists(atPath: frontURL.path),
               FileManager.default.fileExists(atPath: backURL.path) else {
-            print("❌ Video files do not exist")
+            print("Video files do not exist")
             return
         }
 
         do {
             let frontFileSize = try FileManager.default.attributesOfItem(atPath: frontURL.path)[.size] as? UInt64 ?? 0
             let backFileSize = try FileManager.default.attributesOfItem(atPath: backURL.path)[.size] as? UInt64 ?? 0
-            print("📊 Front file size: \(frontFileSize) bytes")
-            print("📊 Back file size: \(backFileSize) bytes")
+            print("Front file size: \(frontFileSize) bytes")
+            print("Back file size: \(backFileSize) bytes")
         } catch {
-            print("⚠️ Could not get file sizes: \(error)")
+            print("Could not get file sizes: \(error)")
         }
 
         DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
-            print("⏳ Starting video processing after delay...")
-
             let tempDir = FileManager.default.temporaryDirectory
             let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let croppedFrontURL = tempDir.appendingPathComponent("cropped_front_\(Date().timeIntervalSince1970).mp4")
@@ -260,45 +253,37 @@ class CameraController: NSObject, ObservableObject {
 
             let dispatchGroup = DispatchGroup()
 
-            print("✂️ Starting front video crop...")
             dispatchGroup.enter()
             Task {
                 do {
                     try await self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL)
-                    print("✅ Front crop completed")
                     dispatchGroup.leave()
                 } catch {
-                    print("❌ Front crop failed: \(error.localizedDescription)")
+                    print("Front crop failed: \(error.localizedDescription)")
                     dispatchGroup.leave()
                 }
             }
 
-            print("✂️ Starting back video crop...")
             dispatchGroup.enter()
             Task {
                 do {
                     try await self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL)
-                    print("✅ Back crop completed")
                     dispatchGroup.leave()
                 } catch {
-                    print("❌ Back crop failed: \(error.localizedDescription)")
+                    print("Back crop failed: \(error.localizedDescription)")
                     dispatchGroup.leave()
                 }
             }
 
             dispatchGroup.notify(queue: .main) {
-                print("🔄 Both crops completed, starting merge...")
                 let mergedOutputURL = tempDir.appendingPathComponent("merged_\(Date().timeIntervalSince1970).mp4")
 
                 Task {
                     do {
                         try await self.mergeVideosTopBottom(videoURL1: croppedFrontURL, videoURL2: croppedBackURL, outputURL: mergedOutputURL)
-                        print("✅ Video merge completed: \(mergedOutputURL)")
                         let finalMergedWithAudioURL = docsDir.appendingPathComponent("merged_with_audio_\(Date().timeIntervalSince1970).mp4")
 
-                        print("🔊 Starting audio merge...")
                         try await self.mergeVideosWithAudio(frontVideoURL: mergedOutputURL, frontAudioURL: frontURL, outputURL: finalMergedWithAudioURL)
-                        print("✅ Final video with audio at \(finalMergedWithAudioURL)")
                         
                         try? FileManager.default.removeItem(at: frontURL)
                         try? FileManager.default.removeItem(at: backURL)
@@ -318,13 +303,12 @@ class CameraController: NSObject, ObservableObject {
 
                         do {
                             try context.save()
-                            print("📦 Saved to Core Data")
                             self.onVideoProcessed?()
                         } catch {
-                            print("❌ Failed to save to Core Data: \(error.localizedDescription)")
+                            print("Failed to save to Core Data: \(error.localizedDescription)")
                         }
                     } catch {
-                        print("❌ Merge failed: \(error.localizedDescription)")
+                        print("Merge failed: \(error.localizedDescription)")
                     }
                 }
             }
@@ -498,17 +482,14 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
 
         if let error = error {
             print("Recording error: \(error.localizedDescription)")
-        } else {
-            print("Recording saved to \(outputFileURL)")
-        }
+        } 
 
         if recordingCompletionCount >= 2 {
             DispatchQueue.main.async {
                 if let context = self.storedContext {
-                    print("✅ Both recordings complete, starting video processing...")
                     self.processVideos(context: context)
                 } else {
-                    print("❌ No context available for video processing")
+                    print("No context available for video processing")
                 }
             }
         }

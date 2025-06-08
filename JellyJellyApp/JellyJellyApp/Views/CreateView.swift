@@ -60,7 +60,6 @@ struct CreateView: View {
                 }
             }
             .onAppear {
-                print("CreateView appeared - setting up camera")
                 pauseAllVideos()
                 cameraController.setupCamera()
 
@@ -70,7 +69,6 @@ struct CreateView: View {
                 }
             }
             .onDisappear {
-                print("CreateView disappeared - stopping camera")
                 cameraController.stopCamera()
             }
             .onChange(of: cameraController.isRecording) { _, isRecording in

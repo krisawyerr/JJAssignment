@@ -120,7 +120,7 @@ struct LibraryView: View {
                     .kern: 2
                 ]
             } else {
-                print("⚠️ Font not found: Ranchers-Regular")
+                print("Font not found: Ranchers-Regular")
             }
 
             appearance.shadowColor = .clear
@@ -150,7 +150,7 @@ struct LibraryView: View {
             let cgImage = try await imageGenerator.image(at: .zero).image
             return UIImage(cgImage: cgImage)
         } catch {
-            print("❌ Thumbnail error: \(error.localizedDescription)")
+            print("Error: \(error.localizedDescription)")
             return nil
         }
     }
