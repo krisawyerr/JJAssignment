@@ -24,6 +24,8 @@ class CameraController: NSObject, ObservableObject {
     @Published var immediatePreviewURL: URL?
     @Published var frontPreviewURL: URL?
     @Published var backPreviewURL: URL?
+    @Published var frontZoomFactor: CGFloat = 1.0
+    @Published var backZoomFactor: CGFloat = 1.0
 
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
@@ -31,6 +33,8 @@ class CameraController: NSObject, ObservableObject {
     private var backInput: AVCaptureDeviceInput?
     private var audioInput: AVCaptureDeviceInput?
     private var isSessionSetup = false
+    private var frontInitialZoom: CGFloat = 1.0
+    private var backInitialZoom: CGFloat = 1.0
 
     private var recordingTimer: Timer?
     private let maxRecordingTime = 15000
@@ -458,6 +462,45 @@ class CameraController: NSObject, ObservableObject {
             try await exportSession.export(to: outputURL, as: .mp4)
         } catch {
             throw error
+        }
+    }
+
+    func setZoomFactor(_ factor: CGFloat, forCamera position: AVCaptureDevice.Position) {
+        guard let device = position == .front ? frontCamera : backCamera else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            let maxZoom = device.activeFormat.videoMaxZoomFactor
+            let clampedFactor = min(max(factor, 1.0), maxZoom)
+            
+            if position == .front {
+                frontZoomFactor = clampedFactor
+                device.videoZoomFactor = clampedFactor
+            } else {
+                backZoomFactor = clampedFactor
+                device.videoZoomFactor = clampedFactor
+            }
+            
+            device.unlockForConfiguration()
+        } catch {
+            print("Error setting zoom factor: \(error.localizedDescription)")
+        }
+    }
+
+    func handlePinchGesture(_ gesture: UIPinchGestureRecognizer, forCamera position: AVCaptureDevice.Position) {
+        switch gesture.state {
+        case .began:
+            if position == .front {
+                frontInitialZoom = frontZoomFactor
+            } else {
+                backInitialZoom = backZoomFactor
+            }
+        case .changed:
+            let scale = gesture.scale
+            let newZoomFactor = position == .front ? frontInitialZoom * scale : backInitialZoom * scale
+            setZoomFactor(newZoomFactor, forCamera: position)
+        default:
+            break
         }
     }
 }

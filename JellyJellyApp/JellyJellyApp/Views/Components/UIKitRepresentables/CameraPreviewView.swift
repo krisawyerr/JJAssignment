@@ -15,6 +15,7 @@ struct CameraPreviewView: UIViewRepresentable {
     func makeUIView(context: Context) -> CameraPreviewUIView {
         let view = CameraPreviewUIView()
         controller.setPreviewView(view)
+        view.setCameraController(controller)
         return view
     }
 
@@ -24,6 +25,19 @@ struct CameraPreviewView: UIViewRepresentable {
 class CameraPreviewUIView: UIView {
     var frontPreviewLayer: AVCaptureVideoPreviewLayer?
     var backPreviewLayer: AVCaptureVideoPreviewLayer?
+    private var frontPinchGesture: UIPinchGestureRecognizer?
+    private var backPinchGesture: UIPinchGestureRecognizer?
+    private weak var cameraController: CameraController?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = true
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        isUserInteractionEnabled = true
+    }
 
     func setupPreviewLayers(with session: AVCaptureMultiCamSession) {
         cleanupPreviewLayers()
@@ -38,12 +52,39 @@ class CameraPreviewUIView: UIView {
 
         if let frontLayer = frontPreviewLayer {
             layer.addSublayer(frontLayer)
+            setupPinchGesture(for: .front)
         }
         if let backLayer = backPreviewLayer {
             layer.addSublayer(backLayer)
+            setupPinchGesture(for: .back)
         }
 
         setNeedsLayout()
+    }
+
+    private func setupPinchGesture(for position: AVCaptureDevice.Position) {
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinchGesture.delegate = self
+        addGestureRecognizer(pinchGesture)
+        
+        if position == .front {
+            frontPinchGesture = pinchGesture
+        } else {
+            backPinchGesture = pinchGesture
+        }
+    }
+
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let cameraController = cameraController else { return }
+        
+        let location = gesture.location(in: self)
+        let position: AVCaptureDevice.Position = location.y < bounds.height / 2 ? .front : .back
+        
+        cameraController.handlePinchGesture(gesture, forCamera: position)
+    }
+
+    func setCameraController(_ controller: CameraController) {
+        self.cameraController = controller
     }
 
     private func setupConnections(for session: AVCaptureMultiCamSession) {
@@ -75,5 +116,11 @@ class CameraPreviewUIView: UIView {
         let halfHeight = bounds.height / 2
         frontPreviewLayer?.frame = CGRect(x: 0, y: 0, width: bounds.width, height: halfHeight)
         backPreviewLayer?.frame = CGRect(x: 0, y: halfHeight, width: bounds.width, height: halfHeight)
+    }
+}
+
+extension CameraPreviewUIView: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
 }
