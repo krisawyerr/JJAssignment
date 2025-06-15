@@ -45,8 +45,9 @@ struct CreateView: View {
                                             selectedTab = .library
                                         }
                                     } else {
-                                        cameraController.onVideoProcessed = {
-                                            if let mergedURL = cameraController.mergedVideoURL {
+                                        cameraController.onVideoProcessed = { [weak cameraController] in
+                                            guard let controller = cameraController else { return }
+                                            if let mergedURL = controller.mergedVideoURL {
                                                 let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
                                                 fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
                                                 
@@ -56,11 +57,12 @@ struct CreateView: View {
                                                     
                                                     withAnimation {
                                                         showingPreview = false
-                                                        cameraController.resetPreviewState()
+                                                        controller.resetPreviewState()
                                                     }
                                                     selectedTab = .library
                                                 }
                                             }
+                                            controller.onVideoProcessed = nil
                                         }
                                     }
                                 }) {

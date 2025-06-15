@@ -20,9 +20,13 @@ struct GenericScrollerView<T: VideoPlayable>: View {
     
     private var playerStore: GenericPlayerManagerStore<T> {
         if T.self == ShareableItem.self {
-            return appState.playerStore as! GenericPlayerManagerStore<T>
+            return appState.shareablePlayerStore as! GenericPlayerManagerStore<T>
+        } else if T.self == RecordedVideo.self {
+            return appState.recordedPlayerStore as! GenericPlayerManagerStore<T>
+        } else if T.self == LikedItem.self {
+            return appState.likedPlayerStore as! GenericPlayerManagerStore<T>
         }
-        return GenericPlayerManagerStore<T>()
+        fatalError("Unsupported video type")
     }
     
     var body: some View {

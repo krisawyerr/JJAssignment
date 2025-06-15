@@ -16,7 +16,9 @@ class AppState: ObservableObject {
     @Published var isLoading = true
     
     private let startTime = Date()
-    let playerStore = GenericPlayerManagerStore<ShareableItem>()
+    let shareablePlayerStore = GenericPlayerManagerStore<ShareableItem>()
+    let recordedPlayerStore = GenericPlayerManagerStore<RecordedVideo>()
+    let likedPlayerStore = GenericPlayerManagerStore<LikedItem>()
     
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "JellyJellyApp")
@@ -48,10 +50,10 @@ class AppState: ObservableObject {
             self.shareableItems = items
             
             if !items.isEmpty {
-                playerStore.preloadManager(for: items[0])
+                shareablePlayerStore.preloadManager(for: items[0])
                 
                 if items.count > 1 {
-                    playerStore.preloadManager(for: items[1])
+                    shareablePlayerStore.preloadManager(for: items[1])
                 }
             }
         } catch {
