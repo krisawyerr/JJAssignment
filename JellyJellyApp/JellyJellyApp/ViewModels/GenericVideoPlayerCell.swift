@@ -57,7 +57,11 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                             VStack(spacing: 20) {
                                 if videoItem is ShareableItem || videoItem is LikedItem {
                                     Button(action: {
-                                        handleLike(method: "Button")
+                                        if videoItem is LikedItem {
+                                            handleUnlike(method: "Button")
+                                        } else {
+                                            handleLike(method: "Button")
+                                        }
                                     }) {
                                         Image(systemName: videoItem is LikedItem || isLiked ? "heart.fill" : "heart")
                                             .resizable()
