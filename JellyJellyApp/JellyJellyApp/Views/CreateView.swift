@@ -16,12 +16,18 @@ struct CreateView: View {
     @Binding var isProcessingVideo: Bool
     @State private var progress: CGFloat = 0.0
     @StateObject private var playerStore = GenericPlayerManagerStore<RecordedVideo>()
+    @State private var showingPreview = false
 
     var body: some View {
         VStack {
             ZStack {
-                CameraPreviewView(controller: cameraController)
-                if cameraController.isPreviewReady {
+                if showingPreview, let frontURL = cameraController.frontPreviewURL, let backURL = cameraController.backPreviewURL {
+                    DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                } else {
+                    CameraPreviewView(controller: cameraController)
+                }
+                
+                if cameraController.isPreviewReady && !showingPreview {
                     VStack {
                         Spacer()
                         
@@ -55,18 +61,33 @@ struct CreateView: View {
                         .animation(.easeInOut(duration: 0.2), value: cameraController.isRecording)
                         .padding(.bottom, 50)
                     }
-                } else {
+                } else if !showingPreview {
                     LoadingView(text: "setting up camera...")
                 }
+                
+//                if isProcessingVideo {
+//                    Color.black.opacity(0.7)
+//                        .ignoresSafeArea()
+//                        .overlay(
+//                            VStack {
+//                                ProgressView()
+//                                    .scaleEffect(1.5)
+//                                    .tint(.white)
+//                                Text("Processing video...")
+//                                    .foregroundColor(.white)
+//                                    .padding(.top)
+//                            }
+//                        )
+//                }
             }
             .onAppear {
                 pauseAllVideos()
                 cameraController.setupCamera()
 
-                cameraController.onVideoProcessed = {
-                    isProcessingVideo = false
-                    selectedTab = .library
-                }
+//                cameraController.onVideoProcessed = {
+//                    isProcessingVideo = false
+//                    selectedTab = .library
+//                }
             }
             .onDisappear {
                 cameraController.stopCamera()
@@ -83,6 +104,13 @@ struct CreateView: View {
                     progress = CGFloat(15000 - secondsRemaining) / 15000.0
                     if secondsRemaining <= 0 {
                         isProcessingVideo = true
+                    }
+                }
+            }
+            .onChange(of: cameraController.frontPreviewURL) { _, url in
+                if url != nil && cameraController.backPreviewURL != nil {
+                    withAnimation {
+                        showingPreview = true
                     }
                 }
             }

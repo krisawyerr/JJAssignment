@@ -25,13 +25,13 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
-                HomeView()
-                    .tabItem {
-                        Image(systemName: "house.fill")
-                        Text("Home")
-                    }
-                    .tag(Tab.home)
-                    .background(Color("Background"))
+//                HomeView()
+//                    .tabItem {
+//                        Image(systemName: "house.fill")
+//                        Text("Home")
+//                    }
+//                    .tag(Tab.home)
+//                    .background(Color("Background"))
 
                 CreateView(selectedTab: $selectedTab, isProcessingVideo: $isProcessingVideo)
                     .tabItem {
@@ -124,22 +124,22 @@ struct ContentView: View {
                 .background(Color("Background"))
             }
             
-            if isProcessingVideo {
-                Color.black.opacity(0.9)
-                    .ignoresSafeArea()
-                    .overlay(
-                        VStack(spacing: 20) {
-                            Text("Processing video...")
-                                .font(.custom("Ranchers-Regular", size: 25))
-                                .foregroundColor(.white)
-                                .kerning(1.5)
-                                .padding(.bottom, 10)
-                            ProgressView()
-                                .scaleEffect(2)
-                                .tint(.white)
-                        }
-                    )
-            }
+//            if isProcessingVideo {
+//                Color.black.opacity(0.9)
+//                    .ignoresSafeArea()
+//                    .overlay(
+//                        VStack(spacing: 20) {
+//                            Text("Processing video...")
+//                                .font(.custom("Ranchers-Regular", size: 25))
+//                                .foregroundColor(.white)
+//                                .kerning(1.5)
+//                                .padding(.bottom, 10)
+//                            ProgressView()
+//                                .scaleEffect(2)
+//                                .tint(.white)
+//                        }
+//                    )
+//            }
         }
     }
 }

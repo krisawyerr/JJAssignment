@@ -21,6 +21,9 @@ class CameraController: NSObject, ObservableObject {
     @Published var isRecording = false
     @Published var secondsRemaining = 15000
     @Published var isPreviewReady = false
+    @Published var immediatePreviewURL: URL?
+    @Published var frontPreviewURL: URL?
+    @Published var backPreviewURL: URL?
 
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
@@ -486,8 +489,15 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
 
         if recordingCompletionCount >= 2 {
             DispatchQueue.main.async {
+                if let frontURL = self.frontURL, let backURL = self.backURL {
+                    self.frontPreviewURL = frontURL
+                    self.backPreviewURL = backURL
+                }
+                
                 if let context = self.storedContext {
-                    self.processVideos(context: context)
+                    Task {
+                        await self.processVideos(context: context)
+                    }
                 } else {
                     print("No context available for video processing")
                 }

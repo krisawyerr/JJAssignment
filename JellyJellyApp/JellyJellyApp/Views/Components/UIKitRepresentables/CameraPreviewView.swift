@@ -8,7 +8,7 @@
 import SwiftUI
 import AVFoundation
 import CoreData
-
+ 
 struct CameraPreviewView: UIViewRepresentable {
     let controller: CameraController
 
