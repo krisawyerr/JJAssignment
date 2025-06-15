@@ -37,6 +37,7 @@ class CameraController: NSObject, ObservableObject {
 
     private var recordingCompletionCount = 0
     private var storedContext: NSManagedObjectContext?
+    private var processingStartTime: CFAbsoluteTime = 0
 
     var onVideoProcessed: (() -> Void)?
 
@@ -227,7 +228,6 @@ class CameraController: NSObject, ObservableObject {
     }
 
     private func processVideos(context: NSManagedObjectContext) {
-
         guard let frontURL = self.frontURL,
               let backURL = self.backURL else {
             return
@@ -239,80 +239,64 @@ class CameraController: NSObject, ObservableObject {
             return
         }
 
-        do {
-            let frontFileSize = try FileManager.default.attributesOfItem(atPath: frontURL.path)[.size] as? UInt64 ?? 0
-            let backFileSize = try FileManager.default.attributesOfItem(atPath: backURL.path)[.size] as? UInt64 ?? 0
-            print("Front file size: \(frontFileSize) bytes")
-            print("Back file size: \(backFileSize) bytes")
-        } catch {
-            print("Could not get file sizes: \(error)")
-        }
-
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
             let tempDir = FileManager.default.temporaryDirectory
             let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let croppedFrontURL = tempDir.appendingPathComponent("cropped_front_\(Date().timeIntervalSince1970).mp4")
             let croppedBackURL = tempDir.appendingPathComponent("cropped_back_\(Date().timeIntervalSince1970).mp4")
+            let mergedOutputURL = tempDir.appendingPathComponent("merged_\(Date().timeIntervalSince1970).mp4")
+            let finalMergedWithAudioURL = docsDir.appendingPathComponent("merged_with_audio_\(Date().timeIntervalSince1970).mp4")
 
-            let dispatchGroup = DispatchGroup()
-
-            dispatchGroup.enter()
             Task {
                 do {
-                    try await self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL)
-                    dispatchGroup.leave()
-                } catch {
-                    print("Front crop failed: \(error.localizedDescription)")
-                    dispatchGroup.leave()
-                }
-            }
-
-            dispatchGroup.enter()
-            Task {
-                do {
-                    try await self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL)
-                    dispatchGroup.leave()
-                } catch {
-                    print("Back crop failed: \(error.localizedDescription)")
-                    dispatchGroup.leave()
-                }
-            }
-
-            dispatchGroup.notify(queue: .main) {
-                let mergedOutputURL = tempDir.appendingPathComponent("merged_\(Date().timeIntervalSince1970).mp4")
-
-                Task {
-                    do {
-                        try await self.mergeVideosTopBottom(videoURL1: croppedFrontURL, videoURL2: croppedBackURL, outputURL: mergedOutputURL)
-                        let finalMergedWithAudioURL = docsDir.appendingPathComponent("merged_with_audio_\(Date().timeIntervalSince1970).mp4")
-
-                        try await self.mergeVideosWithAudio(frontVideoURL: mergedOutputURL, frontAudioURL: frontURL, outputURL: finalMergedWithAudioURL)
-                        
-                        try? FileManager.default.removeItem(at: frontURL)
-                        try? FileManager.default.removeItem(at: backURL)
-                        try? FileManager.default.removeItem(at: croppedFrontURL)
-                        try? FileManager.default.removeItem(at: croppedBackURL)
-                        try? FileManager.default.removeItem(at: mergedOutputURL)
-                        
-                        await MainActor.run {
-                            self.mergedVideoURL = finalMergedWithAudioURL
-                        }
-
-                        let newRecording = RecordedVideo(context: context)
-                        newRecording.createdAt = Date()
-                        newRecording.mergedVideoURL = finalMergedWithAudioURL.absoluteString
-                        newRecording.frontVideoURL = frontURL.absoluteString
-                        newRecording.backVideoURL = backURL.absoluteString
-
+                    async let frontCrop = self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL)
+                    async let backCrop = self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL)
+                    
+                    try await (frontCrop, backCrop)
+                    
+                    try await self.mergeVideosTopBottom(videoURL1: croppedFrontURL, videoURL2: croppedBackURL, outputURL: mergedOutputURL)
+                    
+                    try? FileManager.default.removeItem(at: croppedFrontURL)
+                    try? FileManager.default.removeItem(at: croppedBackURL)
+                    
+                    let newRecording = RecordedVideo(context: context)
+                    newRecording.createdAt = Date()
+                    newRecording.mergedVideoURL = mergedOutputURL.absoluteString
+                    newRecording.frontVideoURL = frontURL.absoluteString
+                    newRecording.backVideoURL = backURL.absoluteString
+                    
+                    try context.save()
+                    
+                    Task {
                         do {
+                            try await self.mergeVideosWithAudio(frontVideoURL: mergedOutputURL, frontAudioURL: frontURL, outputURL: finalMergedWithAudioURL)
+                            
+                            newRecording.mergedVideoURL = finalMergedWithAudioURL.absoluteString
                             try context.save()
-                            self.onVideoProcessed?()
+                            
+                            try? FileManager.default.removeItem(at: frontURL)
+                            try? FileManager.default.removeItem(at: backURL)
+                            try? FileManager.default.removeItem(at: mergedOutputURL)
+                            
+                            let endTime = CFAbsoluteTimeGetCurrent()
+                            let totalProcessingTime = (endTime - self.processingStartTime) * 1000
+                            print("Total processing time: \(String(format: "%.1f", totalProcessingTime))ms")
+                            
+                            await MainActor.run {
+                                self.mergedVideoURL = finalMergedWithAudioURL
+                                self.onVideoProcessed?()
+                            }
                         } catch {
-                            print("Failed to save to Core Data: \(error.localizedDescription)")
+                            print("Audio merge failed: \(error.localizedDescription)")
                         }
-                    } catch {
-                        print("Merge failed: \(error.localizedDescription)")
                     }
+                    
+                    await MainActor.run {
+                        self.mergedVideoURL = mergedOutputURL
+                    }
+                    
+                } catch {
+                    print("Video processing failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -355,13 +339,14 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.renderSize = CGSize(width: cropWidth, height: naturalSize.height)
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetMediumQuality) else {
             throw NSError(domain: "Export session failed", code: -3)
         }
         
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.videoComposition = videoComposition
+        exportSession.shouldOptimizeForNetworkUse = true
         
         do {
             try await exportSession.export(to: outputURL, as: .mp4)
@@ -424,7 +409,7 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
         videoComposition.instructions = [instruction]
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetMediumQuality) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -461,7 +446,7 @@ class CameraController: NSObject, ObservableObject {
         try videoCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero)
         try audioCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: audioTrack, at: .zero)
         
-        guard let exportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPresetMediumQuality) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -495,6 +480,8 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
                 }
                 
                 if let context = self.storedContext {
+                    self.processingStartTime = CFAbsoluteTimeGetCurrent()
+                    print("Starting video processing at: \(self.processingStartTime)")
                     Task {
                         await self.processVideos(context: context)
                     }
