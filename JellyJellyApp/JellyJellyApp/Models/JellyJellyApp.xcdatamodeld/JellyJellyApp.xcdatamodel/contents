@@ -17,5 +17,6 @@
         <attribute name="frontVideoURL" optional="YES" attributeType="String"/>
         <attribute name="mergedVideoURL" optional="YES" attributeType="String"/>
         <attribute name="saved" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="firebaseStorageURL" optional="YES" attributeType="String"/>
     </entity>
 </model>

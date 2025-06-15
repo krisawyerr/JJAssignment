@@ -8,11 +8,13 @@
 import SwiftUI
 import AVFoundation
 import CoreData
+import FirebaseStorage
 
 class CameraController: NSObject, ObservableObject {
     private let session = AVCaptureMultiCamSession()
     private let frontOutput = AVCaptureMovieFileOutput()
     private let backOutput = AVCaptureMovieFileOutput()
+    private let storage = Storage.storage()
 
     private weak var previewView: CameraPreviewUIView?
     private var frontURL: URL?
@@ -91,6 +93,15 @@ class CameraController: NSObject, ObservableObject {
                 
                 if let video = try? context.fetch(fetchRequest).first {
                     self.lastRecordedVideo = video
+                    
+                    Task {
+                        do {
+                            try await self.deleteVideoFromFirebase(video: video)
+                        } catch {
+                            print("Error deleting video from Firebase: \(error.localizedDescription)")
+                        }
+                    }
+                    
                     context.delete(video)
                     try? context.save()
                 }
@@ -372,6 +383,8 @@ class CameraController: NSObject, ObservableObject {
                     self.onVideoProcessed?()
                 }
                 
+                try await self.uploadVideoToFirebase(video: newRecording, context: context)
+                
             } catch {
                 print("Video processing failed: \(error.localizedDescription)")
                 try? FileManager.default.removeItem(at: croppedFrontURL)
@@ -419,7 +432,7 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.renderSize = CGSize(width: cropWidth, height: naturalSize.height)
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetMediumQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw NSError(domain: "Export session failed", code: -3)
         }
         
@@ -485,7 +498,7 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
         videoComposition.instructions = [instruction]
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetMediumQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -522,7 +535,7 @@ class CameraController: NSObject, ObservableObject {
         try videoCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero)
         try audioCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: audioTrack, at: .zero)
         
-        guard let exportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPresetMediumQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPresetHighestQuality) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -574,6 +587,37 @@ class CameraController: NSObject, ObservableObject {
         default:
             break
         }
+    }
+
+    func uploadVideoToFirebase(video: RecordedVideo, context: NSManagedObjectContext) async throws {
+        guard let mergedVideoURL = video.mergedVideoURL,
+              let videoURL = URL(string: mergedVideoURL) else {
+            throw NSError(domain: "VideoError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid video URL"])
+        }
+
+        let timestamp = Date().timeIntervalSince1970
+        let storageRef = storage.reference().child("videos/\(timestamp).mp4")
+        
+        let metadata = StorageMetadata()
+        metadata.contentType = "video/mp4"
+        
+        _ = try await storageRef.putFileAsync(from: videoURL, metadata: metadata)
+        let downloadURL = try await storageRef.downloadURL()
+        
+        await MainActor.run {
+            video.firebaseStorageURL = downloadURL.absoluteString
+            try? context.save()
+        }
+    }
+    
+    func deleteVideoFromFirebase(video: RecordedVideo) async throws {
+        guard let firebaseURL = video.firebaseStorageURL,
+              let url = URL(string: firebaseURL) else {
+            return
+        }
+        
+        let storageRef = storage.reference(forURL: firebaseURL)
+        try await storageRef.delete()
     }
 }
 

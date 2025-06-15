@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		605DAEBC2DFF87810081455C /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 605DAEBB2DFF87810081455C /* FirebaseStorage */; };
+		605DAEBE2DFF87D10081455C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 605DAEBD2DFF87D10081455C /* FirebaseCore */; };
 		60F4E06C2DF23DA4009D3D7F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 60F4E06B2DF23DA4009D3D7F /* Lottie */; };
 /* End PBXBuildFile section */
 
@@ -41,6 +43,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				60F4E06C2DF23DA4009D3D7F /* Lottie in Frameworks */,
+				605DAEBE2DFF87D10081455C /* FirebaseCore in Frameworks */,
+				605DAEBC2DFF87810081455C /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +88,8 @@
 			name = JellyJellyApp;
 			packageProductDependencies = (
 				60F4E06B2DF23DA4009D3D7F /* Lottie */,
+				605DAEBB2DFF87810081455C /* FirebaseStorage */,
+				605DAEBD2DFF87D10081455C /* FirebaseCore */,
 			);
 			productName = JellyJellyApp;
 			productReference = 600E4EE82DEF42AC00A193CE /* JellyJellyApp.app */;
@@ -115,6 +121,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				60F4E06A2DF23DA4009D3D7F /* XCRemoteSwiftPackageReference "lottie-ios" */,
+				605DAEBA2DFF87810081455C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 600E4EE92DEF42AC00A193CE /* Products */;
@@ -360,6 +367,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		605DAEBA2DFF87810081455C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.14.0;
+			};
+		};
 		60F4E06A2DF23DA4009D3D7F /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/airbnb/lottie-ios";
@@ -371,6 +386,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		605DAEBB2DFF87810081455C /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 605DAEBA2DFF87810081455C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		605DAEBD2DFF87D10081455C /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 605DAEBA2DFF87810081455C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
 		60F4E06B2DF23DA4009D3D7F /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 60F4E06A2DF23DA4009D3D7F /* XCRemoteSwiftPackageReference "lottie-ios" */;

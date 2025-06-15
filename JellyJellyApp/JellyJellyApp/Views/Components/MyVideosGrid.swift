@@ -35,6 +35,15 @@ struct MyVideosGrid: View {
                         Label("Save to Photos", systemImage: "arrow.down.circle")
                     }
                     
+                    if let firebaseURL = recording.firebaseStorageURL,
+                       let url = URL(string: firebaseURL) {
+                        Button(action: {
+                            UIApplication.shared.open(url)
+                        }) {
+                            Label("Open in Browser", systemImage: "safari")
+                        }
+                    }
+                    
                     Button(role: .destructive, action: {
                         videoToDelete = recording
                         showDeleteConfirmation = true

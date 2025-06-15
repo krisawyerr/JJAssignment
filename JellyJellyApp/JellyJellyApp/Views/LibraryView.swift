@@ -14,6 +14,7 @@ import Photos
 struct LibraryView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject private var appState: AppState
+    @StateObject private var cameraController = CameraController()
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \RecordedVideo.createdAt, ascending: false)],
@@ -200,15 +201,34 @@ struct LibraryView: View {
     }
 
     private func deleteVideo(_ video: RecordedVideo) {
-        if let videoURL = video.mergedVideoURL,
-           let lastComponent = videoURL.components(separatedBy: "/").last,
-           let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let fullURL = documentsURL.appendingPathComponent(lastComponent)
-            try? FileManager.default.removeItem(at: fullURL)
+        Task {
+            do {
+                try await cameraController.deleteVideoFromFirebase(video: video)
+                
+                await MainActor.run {
+                    if let videoURL = video.mergedVideoURL,
+                       let lastComponent = videoURL.components(separatedBy: "/").last,
+                       let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                        let fullURL = documentsURL.appendingPathComponent(lastComponent)
+                        try? FileManager.default.removeItem(at: fullURL)
+                    }
+                    
+                    viewContext.delete(video)
+                    try? viewContext.save()
+                }
+            } catch {
+                print("Error deleting video from Firebase: \(error.localizedDescription)")
+                if let videoURL = video.mergedVideoURL,
+                   let lastComponent = videoURL.components(separatedBy: "/").last,
+                   let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                    let fullURL = documentsURL.appendingPathComponent(lastComponent)
+                    try? FileManager.default.removeItem(at: fullURL)
+                }
+                
+                viewContext.delete(video)
+                try? viewContext.save()
+            }
         }
-        
-        viewContext.delete(video)
-        try? viewContext.save()
     }
 
     private func saveVideoToPhotos(_ video: RecordedVideo) {
