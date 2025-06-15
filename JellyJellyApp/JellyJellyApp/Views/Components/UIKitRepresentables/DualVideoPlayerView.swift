@@ -31,6 +31,8 @@ class DualVideoPlayerController: UIViewController {
     private var backStatusObserver: NSKeyValueObservation?
     private var frontItemObserver: NSKeyValueObservation?
     private var backItemObserver: NSKeyValueObservation?
+    private var frontEndObserver: NSObjectProtocol?
+    private var backEndObserver: NSObjectProtocol?
     
     init(frontURL: URL, backURL: URL) {        
         self.frontPlayer = AVPlayer(url: frontURL)
@@ -47,6 +49,7 @@ class DualVideoPlayerController: UIViewController {
         self.backPlayer.volume = 0.0
         
         setupReadinessObservers()
+        setupEndObservers()
         
         if let frontAsset = frontPlayer.currentItem?.asset {
             frontAsset.loadValuesAsynchronously(forKeys: ["duration", "playable"]) { [weak self] in
@@ -91,6 +94,32 @@ class DualVideoPlayerController: UIViewController {
                 self?.checkIfBothReady()
             }
         }
+    }
+    
+    private func setupEndObservers() {
+        frontEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: frontPlayer.currentItem,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleVideoEnd()
+        }
+        
+        backEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: backPlayer.currentItem,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleVideoEnd()
+        }
+    }
+    
+    private func handleVideoEnd() {
+        frontPlayer.seek(to: .zero)
+        backPlayer.seek(to: .zero)
+        
+        frontPlayer.play()
+        backPlayer.play()
     }
     
     override func viewDidLoad() {
@@ -139,12 +168,23 @@ class DualVideoPlayerController: UIViewController {
     
     private func startPlayback() {
         updateLayerFrames()
+        
+        guard let frontItem = frontPlayer.currentItem,
+              let backItem = backPlayer.currentItem,
+              frontItem.status == .readyToPlay,
+              backItem.status == .readyToPlay else {
+            return
+        }
+        
+        frontPlayer.seek(to: .zero)
+        backPlayer.seek(to: .zero)
+        
         frontPlayer.play()
         backPlayer.play()
-        startMonitoring()
     }
     
     private func startMonitoring() {
+        checkTimer?.invalidate()
         checkTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.checkVideoProgress()
         }
@@ -153,6 +193,14 @@ class DualVideoPlayerController: UIViewController {
     private func checkVideoProgress() {
         let frontTime = frontPlayer.currentTime().seconds
         let backTime = backPlayer.currentTime().seconds
+        
+        let timeDifference = abs(frontTime - backTime)
+        if timeDifference > 0.5 {
+            let targetTime = min(frontTime, backTime)
+            let cmTime = CMTime(seconds: targetTime, preferredTimescale: 600)
+            frontPlayer.seek(to: cmTime)
+            backPlayer.seek(to: cmTime)
+        }
         
         let frontFinished = frontDuration > 0 && frontTime >= (frontDuration - 0.1)
         let backFinished = backDuration > 0 && backTime >= (backDuration - 0.1)
@@ -168,13 +216,17 @@ class DualVideoPlayerController: UIViewController {
         frontPlayer.seek(to: .zero)
         backPlayer.seek(to: .zero)
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.frontPlayer.play()
-            self.backPlayer.play()
-            
-            self.startMonitoring()
-            print("Videos restarted")
+        guard let frontItem = frontPlayer.currentItem,
+              let backItem = backPlayer.currentItem,
+              frontItem.status == .readyToPlay,
+              backItem.status == .readyToPlay else {
+            return
         }
+        
+        frontPlayer.play()
+        backPlayer.play()
+        
+        startMonitoring()
     }
     
     private func updateLayerFrames() {
@@ -198,6 +250,13 @@ class DualVideoPlayerController: UIViewController {
         backStatusObserver?.invalidate()
         frontItemObserver?.invalidate()
         backItemObserver?.invalidate()
+        
+        if let frontEnd = frontEndObserver {
+            NotificationCenter.default.removeObserver(frontEnd)
+        }
+        if let backEnd = backEndObserver {
+            NotificationCenter.default.removeObserver(backEnd)
+        }
         
         checkTimer?.invalidate()
         checkTimer = nil

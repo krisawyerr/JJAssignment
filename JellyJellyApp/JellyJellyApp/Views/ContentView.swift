@@ -25,13 +25,13 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
-//                HomeView()
-//                    .tabItem {
-//                        Image(systemName: "house.fill")
-//                        Text("Home")
-//                    }
-//                    .tag(Tab.home)
-//                    .background(Color("Background"))
+                HomeView()
+                    .tabItem {
+                        Image(systemName: "house.fill")
+                        Text("Home")
+                    }
+                    .tag(Tab.home)
+                    .background(Color("Background"))
 
                 CreateView(selectedTab: $selectedTab, isProcessingVideo: $isProcessingVideo)
                     .tabItem {

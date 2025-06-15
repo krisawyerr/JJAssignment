@@ -22,12 +22,78 @@ struct CreateView: View {
         VStack {
             ZStack {
                 if showingPreview, let frontURL = cameraController.frontPreviewURL, let backURL = cameraController.backPreviewURL {
-                    DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                    ZStack {
+                        DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                        
+                        VStack {
+                            Spacer()
+                            
+                            HStack(spacing: 20) {
+                                Button(action: {
+                                    if let mergedURL = cameraController.mergedVideoURL {
+                                        let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+                                        fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
+                                        
+                                        if let video = try? context.fetch(fetchRequest).first {
+                                            video.saved = true
+                                            try? context.save()
+                                            
+                                            withAnimation {
+                                                showingPreview = false
+                                                cameraController.resetPreviewState()
+                                            }
+                                            selectedTab = .library
+                                        }
+                                    } else {
+                                        cameraController.onVideoProcessed = {
+                                            if let mergedURL = cameraController.mergedVideoURL {
+                                                let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+                                                fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
+                                                
+                                                if let video = try? context.fetch(fetchRequest).first {
+                                                    video.saved = true
+                                                    try? context.save()
+                                                    
+                                                    withAnimation {
+                                                        showingPreview = false
+                                                        cameraController.resetPreviewState()
+                                                    }
+                                                    selectedTab = .library
+                                                }
+                                            }
+                                        }
+                                    }
+                                }) {
+                                    Text("Save")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                        .frame(width: 120, height: 44)
+                                        .background(Color("JellyPrimary"))
+                                        .cornerRadius(22)
+                                }
+                                
+                                Button(action: {
+                                    withAnimation {
+                                        showingPreview = false
+                                    }
+                                    cameraController.retakeVideo()
+                                }) {
+                                    Text("Retake")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                        .frame(width: 120, height: 44)
+                                        .background(Color.red)
+                                        .cornerRadius(22)
+                                }
+                            }
+                            .padding(.bottom, 50)
+                        }
+                    }
                 } else {
                     CameraPreviewView(controller: cameraController)
                 }
                 
-                if cameraController.isPreviewReady && !showingPreview {
+                if !showingPreview {
                     VStack {
                         Spacer()
                         
@@ -60,25 +126,23 @@ struct CreateView: View {
                         .scaleEffect(cameraController.isRecording ? 1.1 : 1.0)
                         .animation(.easeInOut(duration: 0.2), value: cameraController.isRecording)
                         .padding(.bottom, 50)
+                        
+                        if cameraController.isRecording {
+                            Button(action: {
+                                cameraController.undoRecording()
+                                isProcessingVideo = false
+                            }) {
+                                Text("Undo")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 120, height: 44)
+                                    .background(Color.red)
+                                    .cornerRadius(22)
+                            }
+                            .padding(.bottom, 20)
+                        }
                     }
-                } else if !showingPreview {
-                    LoadingView(text: "setting up camera...")
                 }
-                
-//                if isProcessingVideo {
-//                    Color.black.opacity(0.7)
-//                        .ignoresSafeArea()
-//                        .overlay(
-//                            VStack {
-//                                ProgressView()
-//                                    .scaleEffect(1.5)
-//                                    .tint(.white)
-//                                Text("Processing video...")
-//                                    .foregroundColor(.white)
-//                                    .padding(.top)
-//                            }
-//                        )
-//                }
             }
             .onAppear {
                 pauseAllVideos()

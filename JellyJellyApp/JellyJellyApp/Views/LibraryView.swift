@@ -17,6 +17,7 @@ struct LibraryView: View {
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \RecordedVideo.createdAt, ascending: false)],
+        predicate: NSPredicate(format: "saved == YES"),
         animation: .default)
     private var videos: FetchedResults<RecordedVideo>
     
@@ -173,11 +174,6 @@ struct LibraryView: View {
         
         if let customFont = UIFont(name: "Ranchers-Regular", size: 30) {
             appearance.largeTitleTextAttributes = [
-                .font: customFont,
-                .foregroundColor: UIColor.white,
-                .kern: 2 
-            ]
-            appearance.titleTextAttributes = [
                 .font: customFont,
                 .foregroundColor: UIColor.white,
                 .kern: 2
