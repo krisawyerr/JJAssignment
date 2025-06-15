@@ -11,7 +11,7 @@ import UIKit
 import Lottie
 
 struct HomeView: View {
-    @StateObject private var appState = AppState()
+    @EnvironmentObject private var appState: AppState
     @State private var navigationPath = NavigationPath()
     @State private var selectedTab: Tab = .home
     

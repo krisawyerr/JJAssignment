@@ -15,6 +15,9 @@ class AppState: ObservableObject {
     @Published var wasInitiallySetup = false
     @Published var isLoading = true
     
+    private let startTime = Date()
+    let playerStore = GenericPlayerManagerStore<ShareableItem>()
+    
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "JellyJellyApp")
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
@@ -39,7 +42,18 @@ class AppState: ObservableObject {
     func loadInitialData() async {
         do {
             let items = try await fetchShareableItems()
+            let endTime = Date()
+            let timeInterval = endTime.timeIntervalSince(startTime)
+            print("Time from app start to fetchShareableItems response: \(timeInterval) seconds")
             self.shareableItems = items
+            
+            if !items.isEmpty {
+                playerStore.preloadManager(for: items[0])
+                
+                if items.count > 1 {
+                    playerStore.preloadManager(for: items[1])
+                }
+            }
         } catch {
             print("Error fetching shareable item:", error)
         }

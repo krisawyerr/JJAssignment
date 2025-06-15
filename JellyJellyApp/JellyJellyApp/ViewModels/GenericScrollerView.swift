@@ -12,12 +12,18 @@ import Lottie
 
 struct GenericScrollerView<T: VideoPlayable>: View {
     let videoItems: [T]
-    @StateObject private var playerStore = GenericPlayerManagerStore<T>()
+    @EnvironmentObject var appState: AppState
     @State var currentIndex: Int
     @State private var dragOffset: CGFloat = 0
-    @EnvironmentObject var appState: AppState
     @Binding var navigationPath: NavigationPath
     @Binding var selectedTab: Tab
+    
+    private var playerStore: GenericPlayerManagerStore<T> {
+        if T.self == ShareableItem.self {
+            return appState.playerStore as! GenericPlayerManagerStore<T>
+        }
+        return GenericPlayerManagerStore<T>()
+    }
     
     var body: some View {
         GeometryReader { geometry in
