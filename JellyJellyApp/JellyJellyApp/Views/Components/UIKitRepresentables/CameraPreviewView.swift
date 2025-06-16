@@ -34,6 +34,7 @@ class CameraPreviewUIView: UIView {
     private let videoDataOutputQueue = DispatchQueue(label: "VideoDataOutput", qos: .userInitiated, attributes: [], autoreleaseFrequency: .workItem)
     private var frontGridLayer: CAShapeLayer?
     private var backGridLayer: CAShapeLayer?
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -171,8 +172,8 @@ class CameraPreviewUIView: UIView {
                 if session.canAddConnection(videoConnection) {
                     session.addConnection(videoConnection)
                     
-                    if videoConnection.isVideoOrientationSupported {
-                        videoConnection.videoOrientation = AVCaptureVideoOrientation.portrait
+                    if videoConnection.isVideoRotationAngleSupported(.pi/2) {
+                        videoConnection.videoRotationAngle = .pi/2
                     }
                     if videoConnection.isVideoStabilizationSupported {
                         videoConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationMode.auto
@@ -266,7 +267,7 @@ class CameraPreviewUIView: UIView {
         
         blurEffectView?.frame = bounds
         
-        if let cameraController = cameraController {
+        if let _ = cameraController {
             let halfWidth = bounds.width / 2
             
             let aspectRatio: CGFloat = 9.0 / 16.0
@@ -287,7 +288,11 @@ class CameraPreviewUIView: UIView {
 
 extension CameraPreviewUIView: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        backgroundSampleBufferLayer?.enqueue(sampleBuffer)
+        if #available(iOS 18.0, *) {
+            backgroundSampleBufferLayer?.sampleBufferRenderer.enqueue(sampleBuffer)
+        } else {
+            backgroundSampleBufferLayer?.enqueue(sampleBuffer)
+        }
     }
     
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {

@@ -22,19 +22,28 @@ struct CreateView: View {
         VStack {
             ZStack {
                 if showingPreview, let frontURL = cameraController.frontPreviewURL, let backURL = cameraController.backPreviewURL {
-                    ZStack {
-                        if cameraController.useTopBottomLayout {
-                            DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
-                        } else {
-                            SideBySideVideoPlayerView(frontURL: frontURL, backURL: backURL)
-                        }
-                        
-                        VStack {
-                            Spacer()
-                            
-                            HStack(spacing: 20) {
-                                Button(action: {
-                                    if let mergedURL = cameraController.mergedVideoURL {
+                    VideoPlayerPreviewView(
+                        frontURL: frontURL,
+                        backURL: backURL,
+                        onSave: {
+                            if let mergedURL = cameraController.mergedVideoURL {
+                                let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+                                fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
+                                
+                                if let video = try? context.fetch(fetchRequest).first {
+                                    video.saved = true
+                                    try? context.save()
+                                    
+                                    withAnimation {
+                                        showingPreview = false
+                                        cameraController.resetPreviewState()
+                                    }
+                                    selectedTab = .library
+                                }
+                            } else {
+                                cameraController.onVideoProcessed = { [weak cameraController] in
+                                    guard let controller = cameraController else { return }
+                                    if let mergedURL = controller.mergedVideoURL {
                                         let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
                                         fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
                                         
@@ -44,57 +53,22 @@ struct CreateView: View {
                                             
                                             withAnimation {
                                                 showingPreview = false
-                                                cameraController.resetPreviewState()
+                                                controller.resetPreviewState()
                                             }
                                             selectedTab = .library
                                         }
-                                    } else {
-                                        cameraController.onVideoProcessed = { [weak cameraController] in
-                                            guard let controller = cameraController else { return }
-                                            if let mergedURL = controller.mergedVideoURL {
-                                                let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
-                                                fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
-                                                
-                                                if let video = try? context.fetch(fetchRequest).first {
-                                                    video.saved = true
-                                                    try? context.save()
-                                                    
-                                                    withAnimation {
-                                                        showingPreview = false
-                                                        controller.resetPreviewState()
-                                                    }
-                                                    selectedTab = .library
-                                                }
-                                            }
-                                            controller.onVideoProcessed = nil
-                                        }
                                     }
-                                }) {
-                                    Text("Save")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 120, height: 44)
-                                        .background(Color("JellyPrimary"))
-                                        .cornerRadius(22)
-                                }
-                                
-                                Button(action: {
-                                    withAnimation {
-                                        showingPreview = false
-                                    }
-                                    cameraController.retakeVideo()
-                                }) {
-                                    Text("Retake")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 120, height: 44)
-                                        .background(Color.red)
-                                        .cornerRadius(22)
+                                    controller.onVideoProcessed = nil
                                 }
                             }
-                            .padding(.bottom, 50)
-                        }
-                    }
+                        },
+                        onBack: {
+                            withAnimation {
+                                showingPreview = false
+                            }
+                            cameraController.retakeVideo()
+                        }, isSideBySide: !cameraController.useTopBottomLayout
+                    )
                 } else {
                     CameraPreviewView(controller: cameraController)
                 }

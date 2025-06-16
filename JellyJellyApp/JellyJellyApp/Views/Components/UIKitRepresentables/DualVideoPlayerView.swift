@@ -52,17 +52,27 @@ class DualVideoPlayerController: UIViewController {
         setupEndObservers()
         
         if let frontAsset = frontPlayer.currentItem?.asset {
-            frontAsset.loadValuesAsynchronously(forKeys: ["duration", "playable"]) { [weak self] in
-                DispatchQueue.main.async {
-                    self?.checkIfBothReady()
+            Task {
+                do {
+                    _ = try await frontAsset.load(.duration, .isPlayable)
+                    await MainActor.run {
+                        self.checkIfBothReady()
+                    }
+                } catch {
+                    print("Error loading front asset: \(error)")
                 }
             }
         }
         
         if let backAsset = backPlayer.currentItem?.asset {
-            backAsset.loadValuesAsynchronously(forKeys: ["duration", "playable"]) { [weak self] in
-                DispatchQueue.main.async {
-                    self?.checkIfBothReady()
+            Task {
+                do {
+                    _ = try await backAsset.load(.duration, .isPlayable)
+                    await MainActor.run {
+                        self.checkIfBothReady()
+                    }
+                } catch {
+                    print("Error loading back asset: \(error)")
                 }
             }
         }
@@ -125,7 +135,6 @@ class DualVideoPlayerController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         viewDidLoadTime = CFAbsoluteTimeGetCurrent()
-        let timeFromStart = (viewDidLoadTime - setupStartTime) * 1000
         
         frontLayer.videoGravity = .resizeAspectFill
         backLayer.videoGravity = .resizeAspectFill

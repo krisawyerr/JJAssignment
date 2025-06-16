@@ -11,11 +11,11 @@ import CoreData
 import FirebaseStorage
 
 class BlurVideoCompositor: NSObject, AVVideoCompositing {
-    var sourcePixelBufferAttributes: [String : Any]? {
+    nonisolated var sourcePixelBufferAttributes: [String : Any]? {
         return [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
     }
     
-    var requiredPixelBufferAttributesForRenderContext: [String : Any] {
+    nonisolated var requiredPixelBufferAttributesForRenderContext: [String : Any] {
         return [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
     }
     
@@ -443,10 +443,8 @@ class CameraController: NSObject, ObservableObject {
                 newRecording.backVideoURL = backURL.absoluteString
                 try context.save()
                 
-                async let frontCrop = self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL)
-                async let backCrop = self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL)
-                
-                try await (frontCrop, backCrop)
+                try await self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL)
+                try await self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL)
                 
                 try await self.mergeVideosTopBottom(videoURL1: croppedFrontURL, videoURL2: croppedBackURL, outputURL: mergedOutputURL)
                 
@@ -685,8 +683,7 @@ class CameraController: NSObject, ObservableObject {
     }
     
     func deleteVideoFromFirebase(video: RecordedVideo) async throws {
-        guard let firebaseURL = video.firebaseStorageURL,
-              let url = URL(string: firebaseURL) else {
+        guard let firebaseURL = video.firebaseStorageURL else {
             return
         }
         
@@ -722,10 +719,8 @@ class CameraController: NSObject, ObservableObject {
                 newRecording.isSideBySide = true
                 try context.save()
 
-                async let frontRotate = self.rotateVideo(inputURL: frontURL, outputURL: rotatedFrontURL)
-                async let backRotate = self.rotateVideo(inputURL: backURL, outputURL: rotatedBackURL)
-                
-                try await (frontRotate, backRotate)
+                try await self.rotateVideo(inputURL: frontURL, outputURL: rotatedFrontURL)
+                try await self.rotateVideo(inputURL: backURL, outputURL: rotatedBackURL)
                 
                 try await self.mergeVideosSideBySide(frontVideoURL: rotatedFrontURL, backVideoURL: rotatedBackURL, outputURL: mergedOutputURL)
                 
@@ -897,9 +892,9 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
                     print("Starting video processing at: \(self.processingStartTime)")
                     Task {
                         if self.useTopBottomLayout {
-                            await self.processVideos(context: context)
+                            self.processVideos(context: context)
                         } else {
-                            await self.processVideosSideBySide(context: context)
+                            self.processVideosSideBySide(context: context)
                         }
                     }
                 } else {
