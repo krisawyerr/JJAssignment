@@ -10,12 +10,95 @@ import AVFoundation
 import CoreData
 import FirebaseStorage
 
+class BlurVideoCompositor: NSObject, AVVideoCompositing {
+    var sourcePixelBufferAttributes: [String : Any]? {
+        return [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+    }
+    
+    var requiredPixelBufferAttributesForRenderContext: [String : Any] {
+        return [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+    }
+    
+    private var context: CIContext?
+    private var blurFilter: CIFilter?
+    
+    override init() {
+        super.init()
+        context = CIContext()
+        blurFilter = CIFilter(name: "CIGaussianBlur")
+        blurFilter?.setValue(5.0, forKey: kCIInputRadiusKey)
+    }
+    
+    func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
+        context = CIContext()
+    }
+    
+    func startRequest(_ asyncVideoCompositionRequest: AVAsynchronousVideoCompositionRequest) {
+        guard let sourcePixelBuffer = asyncVideoCompositionRequest.sourceFrame(byTrackID: kCMPersistentTrackID_Invalid) else {
+            if let blackPixelBuffer = createBlackPixelBuffer(size: asyncVideoCompositionRequest.renderContext.size) {
+                asyncVideoCompositionRequest.finish(withComposedVideoFrame: blackPixelBuffer)
+            } else {
+                if let originalPixelBuffer = asyncVideoCompositionRequest.sourceFrame(byTrackID: kCMPersistentTrackID_Invalid) {
+                    asyncVideoCompositionRequest.finish(withComposedVideoFrame: originalPixelBuffer)
+                }
+            }
+            return
+        }
+        
+        let ciImage = CIImage(cvPixelBuffer: sourcePixelBuffer)
+        blurFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+        
+        guard let outputImage = blurFilter?.outputImage,
+              let context = context,
+              let outputPixelBuffer = asyncVideoCompositionRequest.renderContext.newPixelBuffer() else {
+            asyncVideoCompositionRequest.finish(withComposedVideoFrame: sourcePixelBuffer)
+            return
+        }
+        
+        context.render(outputImage, to: outputPixelBuffer)
+        asyncVideoCompositionRequest.finish(withComposedVideoFrame: outputPixelBuffer)
+    }
+    
+    private func createBlackPixelBuffer(size: CGSize) -> CVPixelBuffer? {
+        var pixelBuffer: CVPixelBuffer?
+        let attrs = [kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+                    kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue] as CFDictionary
+        
+        let status = CVPixelBufferCreate(kCFAllocatorDefault,
+                                       Int(size.width),
+                                       Int(size.height),
+                                       kCVPixelFormatType_32BGRA,
+                                       attrs,
+                                       &pixelBuffer)
+        
+        guard status == kCVReturnSuccess, let pixelBuffer = pixelBuffer else {
+            return nil
+        }
+        
+        CVPixelBufferLockBaseAddress(pixelBuffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
+        
+        let context = CGContext(data: CVPixelBufferGetBaseAddress(pixelBuffer),
+                              width: Int(size.width),
+                              height: Int(size.height),
+                              bitsPerComponent: 8,
+                              bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+                              space: CGColorSpaceCreateDeviceRGB(),
+                              bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
+        
+        context?.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        context?.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        
+        return pixelBuffer
+    }
+}
+
 class CameraController: NSObject, ObservableObject {
     private let session = AVCaptureMultiCamSession()
     private let frontOutput = AVCaptureMovieFileOutput()
     private let backOutput = AVCaptureMovieFileOutput()
     private let storage = Storage.storage()
-
+    
     private weak var previewView: CameraPreviewUIView?
     private var frontURL: URL?
     private var backURL: URL?
@@ -29,7 +112,7 @@ class CameraController: NSObject, ObservableObject {
     @Published var frontZoomFactor: CGFloat = 1.0
     @Published var backZoomFactor: CGFloat = 1.0
     @Published var useTopBottomLayout: Bool = true
-
+    
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
     private var frontInput: AVCaptureDeviceInput?
@@ -38,21 +121,21 @@ class CameraController: NSObject, ObservableObject {
     private var isSessionSetup = false
     private var frontInitialZoom: CGFloat = 1.0
     private var backInitialZoom: CGFloat = 1.0
-
+    
     private var recordingTimer: Timer?
     private let maxRecordingTime = 15000
-
+    
     private var recordingCompletionCount = 0
     private var storedContext: NSManagedObjectContext?
     private var processingStartTime: CFAbsoluteTime = 0
     private var lastRecordedVideo: RecordedVideo?
-
+    
     var onVideoProcessed: (() -> Void)?
-
+    
     func setPreviewView(_ view: CameraPreviewUIView) {
         self.previewView = view
     }
-
+    
     func resetPreviewState() {
         frontURL = nil
         backURL = nil
@@ -65,7 +148,7 @@ class CameraController: NSObject, ObservableObject {
         secondsRemaining = maxRecordingTime
         recordingCompletionCount = 0
     }
-
+    
     func retakeVideo() {
         let frontURLToDelete = frontURL
         let backURLToDelete = backURL
@@ -124,7 +207,7 @@ class CameraController: NSObject, ObservableObject {
             }
         }
     }
-
+    
     func undoRecording() {
         if isRecording {
             frontOutput.stopRecording()
@@ -149,55 +232,55 @@ class CameraController: NSObject, ObservableObject {
         
         stopTimer()
     }
-
+    
     func setupCamera() {
         resetSession()
-
+        
         guard AVCaptureMultiCamSession.isMultiCamSupported else {
             print("MultiCam not supported")
             return
         }
-
+        
         session.beginConfiguration()
-
+        
         if let front = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
            let frontDeviceInput = try? AVCaptureDeviceInput(device: front) {
-
+            
             frontCamera = front
             frontInput = frontDeviceInput
-
+            
             if session.canAddInput(frontDeviceInput) {
                 session.addInput(frontDeviceInput)
             }
-
+            
             for connection in frontOutput.connections {
                 session.removeConnection(connection)
             }
-
+            
             if session.canAddOutput(frontOutput) {
                 session.addOutput(frontOutput)
             }
         }
-
+        
         if let back = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
            let backDeviceInput = try? AVCaptureDeviceInput(device: back) {
-
+            
             backCamera = back
             backInput = backDeviceInput
-
+            
             if session.canAddInput(backDeviceInput) {
                 session.addInput(backDeviceInput)
             }
-
+            
             for connection in backOutput.connections {
                 session.removeConnection(connection)
             }
-
+            
             if session.canAddOutput(backOutput) {
                 session.addOutput(backOutput)
             }
         }
-
+        
         if let microphone = AVCaptureDevice.default(for: .audio),
            let micInput = try? AVCaptureDeviceInput(device: microphone) {
             audioInput = micInput
@@ -205,10 +288,10 @@ class CameraController: NSObject, ObservableObject {
                 session.addInput(micInput)
             }
         }
-
+        
         session.commitConfiguration()
         isSessionSetup = true
-
+        
         if !session.isRunning {
             session.startRunning()
         }
@@ -216,48 +299,48 @@ class CameraController: NSObject, ObservableObject {
         previewView?.setupPreviewLayers(with: session)
         isPreviewReady = true
     }
-
+    
     private func resetSession() {
         stopTimer()
         isPreviewReady = false
-
+        
         if isRecording {
             frontOutput.stopRecording()
             backOutput.stopRecording()
             isRecording = false
         }
-
+        
         recordingCompletionCount = 0
-
+        
         previewView?.cleanupPreviewLayers()
-
+        
         session.beginConfiguration()
-
+        
         session.inputs.forEach { input in
             session.removeInput(input)
         }
-
+        
         session.outputs.forEach { output in
             session.removeOutput(output)
         }
-
+        
         session.commitConfiguration()
-
+        
         isSessionSetup = false
         secondsRemaining = maxRecordingTime
     }
-
+    
     func stopCamera() {
         previewView?.cleanupPreviewLayers()
-
+        
         stopTimer()
-
+        
         if isRecording {
             frontOutput.stopRecording()
             backOutput.stopRecording()
             isRecording = false
         }
-
+        
         if session.isRunning {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
@@ -271,87 +354,87 @@ class CameraController: NSObject, ObservableObject {
             }
         }
     }
-
+    
     func startRecording(context: NSManagedObjectContext) {
         guard !isRecording else { return }
-
+        
         storedContext = context
-
+        
         recordingCompletionCount = 0
         secondsRemaining = maxRecordingTime
-
+        
         let timestamp = Date().timeIntervalSince1970
         let tempDir = FileManager.default.temporaryDirectory
-
+        
         frontURL = tempDir.appendingPathComponent("front_\(timestamp).mov")
         backURL = tempDir.appendingPathComponent("back_\(timestamp).mov")
-
+        
         DispatchQueue.main.async {
             self.isRecording = true
         }
-
+        
         startTimer()
-
+        
         if let frontURL = frontURL {
             frontOutput.startRecording(to: frontURL, recordingDelegate: self)
         }
-
+        
         if let backURL = backURL {
             backOutput.startRecording(to: backURL, recordingDelegate: self)
         }
     }
-
+    
     func stopRecording() {
         guard isRecording else { return }
-
+        
         stopTimer()
-
+        
         frontOutput.stopRecording()
         backOutput.stopRecording()
-
+        
         DispatchQueue.main.async {
             self.isRecording = false
         }
     }
-
+    
     private func startTimer() {
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-
+            
             DispatchQueue.main.async {
                 self.secondsRemaining -= 10
-
+                
                 if self.secondsRemaining <= 0 {
                     self.stopRecording()
                 }
             }
         }
     }
-
+    
     private func stopTimer() {
         recordingTimer?.invalidate()
         recordingTimer = nil
     }
-
+    
     private func processVideos(context: NSManagedObjectContext) {
         guard let frontURL = self.frontURL,
               let backURL = self.backURL else {
             return
         }
-
+        
         guard FileManager.default.fileExists(atPath: frontURL.path),
               FileManager.default.fileExists(atPath: backURL.path) else {
             print("Video files do not exist")
             return
         }
-
+        
         let tempDir = FileManager.default.temporaryDirectory
         let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let croppedFrontURL = tempDir.appendingPathComponent("cropped_front_\(Date().timeIntervalSince1970).mp4")
         let croppedBackURL = tempDir.appendingPathComponent("cropped_back_\(Date().timeIntervalSince1970).mp4")
         let mergedOutputURL = tempDir.appendingPathComponent("merged_\(Date().timeIntervalSince1970).mp4")
         let finalMergedWithAudioURL = docsDir.appendingPathComponent("merged_with_audio_\(Date().timeIntervalSince1970).mp4")
-
+        
         Task {
             do {
                 let newRecording = RecordedVideo(context: context)
@@ -359,7 +442,7 @@ class CameraController: NSObject, ObservableObject {
                 newRecording.frontVideoURL = frontURL.absoluteString
                 newRecording.backVideoURL = backURL.absoluteString
                 try context.save()
-
+                
                 async let frontCrop = self.cropToMiddleThird(inputURL: frontURL, outputURL: croppedFrontURL)
                 async let backCrop = self.cropToMiddleThird(inputURL: backURL, outputURL: croppedBackURL)
                 
@@ -402,7 +485,7 @@ class CameraController: NSObject, ObservableObject {
             }
         }
     }
-
+    
     func cropToMiddleThird(inputURL: URL, outputURL: URL) async throws {
         let asset = AVURLAsset(url: inputURL)
         
@@ -557,7 +640,7 @@ class CameraController: NSObject, ObservableObject {
             throw error
         }
     }
-
+    
     func setZoomFactor(_ factor: CGFloat, forCamera position: AVCaptureDevice.Position) {
         guard let device = position == .front ? frontCamera : backCamera else { return }
         
@@ -579,13 +662,13 @@ class CameraController: NSObject, ObservableObject {
             print("Error setting zoom factor: \(error.localizedDescription)")
         }
     }
-
+    
     func uploadVideoToFirebase(video: RecordedVideo, context: NSManagedObjectContext) async throws {
         guard let mergedVideoURL = video.mergedVideoURL,
               let videoURL = URL(string: mergedVideoURL) else {
             throw NSError(domain: "VideoError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid video URL"])
         }
-
+        
         let timestamp = Date().timeIntervalSince1970
         let storageRef = storage.reference().child("videos/\(timestamp).mp4")
         
@@ -636,6 +719,7 @@ class CameraController: NSObject, ObservableObject {
                 newRecording.createdAt = Date()
                 newRecording.frontVideoURL = frontURL.absoluteString
                 newRecording.backVideoURL = backURL.absoluteString
+                newRecording.isSideBySide = true
                 try context.save()
 
                 async let frontRotate = self.rotateVideo(inputURL: frontURL, outputURL: rotatedFrontURL)

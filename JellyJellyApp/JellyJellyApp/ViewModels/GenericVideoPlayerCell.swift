@@ -23,17 +23,30 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color("JellyPrimary")
+                Color("JellySecondary")
                 
                 if let player = playerManager.player {
-                    AVPlayerView(player: player)
-                        .clipped()
-                        .onTapGesture {
-                            playerManager.togglePlayback()
-                        }
-                        .onTapGesture(count: 2) {
-                            handleLike(method: "Double Tap")
-                        }
+                    if let recordedVideo = videoItem as? RecordedVideo, recordedVideo.isSideBySide {
+                        AVPlayerView(player: player)
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                            .clipped()
+                            .onTapGesture {
+                                playerManager.togglePlayback()
+                            }
+                            .onTapGesture(count: 2) {
+                                handleLike(method: "Double Tap")
+                            }
+                    } else {
+                        AVPlayerView(player: player)
+                            .clipped()
+                            .onTapGesture {
+                                playerManager.togglePlayback()
+                            }
+                            .onTapGesture(count: 2) {
+                                handleLike(method: "Double Tap")
+                            }
+                    }
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))

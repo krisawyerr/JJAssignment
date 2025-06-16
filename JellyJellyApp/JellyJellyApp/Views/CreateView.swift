@@ -23,7 +23,11 @@ struct CreateView: View {
             ZStack {
                 if showingPreview, let frontURL = cameraController.frontPreviewURL, let backURL = cameraController.backPreviewURL {
                     ZStack {
-                        DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                        if cameraController.useTopBottomLayout {
+                            DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                        } else {
+                            SideBySideVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                        }
                         
                         VStack {
                             Spacer()
