@@ -10,11 +10,11 @@ import CoreData
 import AVFoundation
 import AVKit
 import Photos
+import FirebaseStorage
 
 struct LibraryView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject private var appState: AppState
-    @StateObject private var cameraController = CameraController()
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \RecordedVideo.createdAt, ascending: false)],
@@ -203,13 +203,19 @@ struct LibraryView: View {
     private func deleteVideo(_ video: RecordedVideo) {
         Task {
             do {
-                try await cameraController.deleteVideoFromFirebase(video: video)
+                if let videoURLString = video.mergedVideoURL,
+                   let videoURL = URL(string: videoURLString) {
+                    let storage = Storage.storage()
+                    let storageRef = storage.reference()
+                    let videoRef = storageRef.child("videos/\(videoURL.lastPathComponent)")
+                    try await videoRef.delete()
+                }
                 
                 await MainActor.run {
-                    if let videoURL = video.mergedVideoURL,
-                       let lastComponent = videoURL.components(separatedBy: "/").last,
+                    if let videoURLString = video.mergedVideoURL,
+                       let videoURL = URL(string: videoURLString),
                        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                        let fullURL = documentsURL.appendingPathComponent(lastComponent)
+                        let fullURL = documentsURL.appendingPathComponent(videoURL.lastPathComponent)
                         try? FileManager.default.removeItem(at: fullURL)
                     }
                     
@@ -217,11 +223,12 @@ struct LibraryView: View {
                     try? viewContext.save()
                 }
             } catch {
-                print("Error deleting video from Firebase: \(error.localizedDescription)")
-                if let videoURL = video.mergedVideoURL,
-                   let lastComponent = videoURL.components(separatedBy: "/").last,
+                print("Error deleting video: \(error.localizedDescription)")
+                // Still try to delete locally even if Firebase deletion fails
+                if let videoURLString = video.mergedVideoURL,
+                   let videoURL = URL(string: videoURLString),
                    let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                    let fullURL = documentsURL.appendingPathComponent(lastComponent)
+                    let fullURL = documentsURL.appendingPathComponent(videoURL.lastPathComponent)
                     try? FileManager.default.removeItem(at: fullURL)
                 }
                 

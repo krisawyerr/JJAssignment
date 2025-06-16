@@ -258,8 +258,15 @@ class CameraController: NSObject, ObservableObject {
         }
 
         if session.isRunning {
-            DispatchQueue.global(qos: .userInitiated).async {
-                self.session.stopRunning()
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else { return }
+                do {
+                    self.session.beginConfiguration()
+                    self.session.commitConfiguration()
+                    self.session.stopRunning()
+                } catch {
+                    print("Error stopping camera session: \(error.localizedDescription)")
+                }
             }
         }
     }
