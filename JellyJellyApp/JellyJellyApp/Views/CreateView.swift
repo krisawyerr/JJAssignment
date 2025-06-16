@@ -97,6 +97,27 @@ struct CreateView: View {
                 
                 if !showingPreview {
                     VStack {
+                        if !cameraController.isRecording {
+                            HStack {
+                                Spacer()
+                                
+                                Button(action: {
+                                    withAnimation {
+                                        cameraController.useTopBottomLayout.toggle()
+                                    }
+                                }) {
+                                    Image(systemName: cameraController.useTopBottomLayout ? "rectangle.split.1x2" : "rectangle.split.2x1")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.white)
+                                        .padding(12)
+                                        .background(Color("JellyPrimary").opacity(0.8))
+                                        .clipShape(Circle())
+                                }
+                                .padding(.trailing, 20)
+                                .padding(.top, 25)
+                            }
+                        }
+
                         Spacer()
                         
                         Button(action: {

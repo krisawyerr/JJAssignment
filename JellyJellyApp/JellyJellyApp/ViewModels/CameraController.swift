@@ -28,6 +28,7 @@ class CameraController: NSObject, ObservableObject {
     @Published var backPreviewURL: URL?
     @Published var frontZoomFactor: CGFloat = 1.0
     @Published var backZoomFactor: CGFloat = 1.0
+    @Published var useTopBottomLayout: Bool = true
 
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
@@ -626,6 +627,185 @@ class CameraController: NSObject, ObservableObject {
         let storageRef = storage.reference(forURL: firebaseURL)
         try await storageRef.delete()
     }
+    
+    private func processVideosSideBySide(context: NSManagedObjectContext) {
+        guard let frontURL = self.frontURL,
+              let backURL = self.backURL else {
+            return
+        }
+
+        guard FileManager.default.fileExists(atPath: frontURL.path),
+              FileManager.default.fileExists(atPath: backURL.path) else {
+            print("Video files do not exist")
+            return
+        }
+
+        let tempDir = FileManager.default.temporaryDirectory
+        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let rotatedFrontURL = tempDir.appendingPathComponent("rotated_front_\(Date().timeIntervalSince1970).mp4")
+        let rotatedBackURL = tempDir.appendingPathComponent("rotated_back_\(Date().timeIntervalSince1970).mp4")
+        let mergedOutputURL = tempDir.appendingPathComponent("merged_sidebyside_\(Date().timeIntervalSince1970).mp4")
+        let finalMergedWithAudioURL = docsDir.appendingPathComponent("merged_sidebyside_with_audio_\(Date().timeIntervalSince1970).mp4")
+
+        Task {
+            do {
+                let newRecording = RecordedVideo(context: context)
+                newRecording.createdAt = Date()
+                newRecording.frontVideoURL = frontURL.absoluteString
+                newRecording.backVideoURL = backURL.absoluteString
+                try context.save()
+
+                async let frontRotate = self.rotateVideo(inputURL: frontURL, outputURL: rotatedFrontURL)
+                async let backRotate = self.rotateVideo(inputURL: backURL, outputURL: rotatedBackURL)
+                
+                try await (frontRotate, backRotate)
+                
+                try await self.mergeVideosSideBySide(frontVideoURL: rotatedFrontURL, backVideoURL: rotatedBackURL, outputURL: mergedOutputURL)
+                
+                try? FileManager.default.removeItem(at: rotatedFrontURL)
+                try? FileManager.default.removeItem(at: rotatedBackURL)
+                
+                newRecording.mergedVideoURL = mergedOutputURL.absoluteString
+                try context.save()
+                
+                try await self.mergeVideosWithAudio(frontVideoURL: mergedOutputURL, frontAudioURL: frontURL, outputURL: finalMergedWithAudioURL)
+                
+                newRecording.mergedVideoURL = finalMergedWithAudioURL.absoluteString
+                try context.save()
+                
+                try? FileManager.default.removeItem(at: frontURL)
+                try? FileManager.default.removeItem(at: backURL)
+                try? FileManager.default.removeItem(at: mergedOutputURL)
+                
+                let endTime = CFAbsoluteTimeGetCurrent()
+                let totalProcessingTime = (endTime - self.processingStartTime) * 1000
+                print("Total side-by-side processing time: \(String(format: "%.1f", totalProcessingTime))ms")
+                
+                await MainActor.run {
+                    self.mergedVideoURL = finalMergedWithAudioURL
+                    self.onVideoProcessed?()
+                }
+                
+                try await self.uploadVideoToFirebase(video: newRecording, context: context)
+                
+            } catch {
+                print("Side-by-side video processing failed: \(error.localizedDescription)")
+                try? FileManager.default.removeItem(at: rotatedFrontURL)
+                try? FileManager.default.removeItem(at: rotatedBackURL)
+                try? FileManager.default.removeItem(at: mergedOutputURL)
+                try? FileManager.default.removeItem(at: finalMergedWithAudioURL)
+            }
+        }
+    }
+
+    func rotateVideo(inputURL: URL, outputURL: URL) async throws {
+        let asset = AVURLAsset(url: inputURL)
+        
+        let tracks = try await asset.loadTracks(withMediaType: .video)
+        guard let videoTrack = tracks.first else {
+            throw NSError(domain: "No video track found", code: -1)
+        }
+        
+        let composition = AVMutableComposition()
+        guard let compositionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw NSError(domain: "Track creation failed", code: -2)
+        }
+        
+        let duration = try await asset.load(.duration)
+        try compositionTrack.insertTimeRange(
+            CMTimeRange(start: .zero, duration: duration),
+            of: videoTrack,
+            at: .zero
+        )
+        
+        let naturalSize = try await videoTrack.load(.naturalSize)
+        
+        let rotation = CGAffineTransform(rotationAngle: .pi / 2)
+        let translation = CGAffineTransform(translationX: naturalSize.height, y: 0)
+        let transform = rotation.concatenating(translation)
+        
+        let transformer = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionTrack)
+        transformer.setTransform(transform, at: .zero)
+        
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
+        instruction.layerInstructions = [transformer]
+        
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.instructions = [instruction]
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.renderSize = CGSize(width: naturalSize.height, height: naturalSize.width)
+        
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw NSError(domain: "Export session failed", code: -3)
+        }
+        
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.videoComposition = videoComposition
+        exportSession.shouldOptimizeForNetworkUse = true
+        
+        try await exportSession.export(to: outputURL, as: .mp4)
+    }
+
+    func mergeVideosSideBySide(frontVideoURL: URL, backVideoURL: URL, outputURL: URL) async throws {
+        let frontAsset = AVURLAsset(url: frontVideoURL)
+        let backAsset = AVURLAsset(url: backVideoURL)
+        
+        let composition = AVMutableComposition()
+        guard let frontTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let backTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw NSError(domain: "MergeError", code: -1)
+        }
+        
+        let frontTracks = try await frontAsset.loadTracks(withMediaType: .video)
+        let backTracks = try await backAsset.loadTracks(withMediaType: .video)
+        
+        guard let frontAssetTrack = frontTracks.first,
+              let backAssetTrack = backTracks.first else {
+            throw NSError(domain: "MergeError", code: -1)
+        }
+        
+        let frontDuration = try await frontAsset.load(.duration)
+        let backDuration = try await backAsset.load(.duration)
+        let timeRange = CMTimeRange(start: .zero, duration: min(frontDuration, backDuration))
+        
+        try frontTrack.insertTimeRange(timeRange, of: frontAssetTrack, at: .zero)
+        try backTrack.insertTimeRange(timeRange, of: backAssetTrack, at: .zero)
+        
+        let frontSize = try await frontAssetTrack.load(.naturalSize)
+        let backSize = try await backAssetTrack.load(.naturalSize)
+        
+        let finalSize = CGSize(width: frontSize.width + backSize.width, height: max(frontSize.height, backSize.height))
+        
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = timeRange
+        
+        let frontLayerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: frontTrack)
+        frontLayerInstruction.setTransform(CGAffineTransform.identity, at: .zero)
+        
+        let backLayerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: backTrack)
+        let backTransform = CGAffineTransform(translationX: frontSize.width, y: 0)
+        backLayerInstruction.setTransform(backTransform, at: .zero)
+        
+        instruction.layerInstructions = [frontLayerInstruction, backLayerInstruction]
+        
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.renderSize = finalSize
+        videoComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
+        videoComposition.instructions = [instruction]
+        
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw NSError(domain: "ExportError", code: -2)
+        }
+        
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.videoComposition = videoComposition
+        exportSession.shouldOptimizeForNetworkUse = true
+        
+        try await exportSession.export(to: outputURL, as: .mp4)
+    }
 }
 
 extension CameraController: AVCaptureFileOutputRecordingDelegate {
@@ -649,7 +829,11 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
                     self.processingStartTime = CFAbsoluteTimeGetCurrent()
                     print("Starting video processing at: \(self.processingStartTime)")
                     Task {
-                        await self.processVideos(context: context)
+                        if self.useTopBottomLayout {
+                            await self.processVideos(context: context)
+                        } else {
+                            await self.processVideosSideBySide(context: context)
+                        }
                     }
                 } else {
                     print("No context available for video processing")
