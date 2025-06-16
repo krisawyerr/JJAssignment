@@ -25,22 +25,57 @@ struct CameraPreviewView: UIViewRepresentable {
 class CameraPreviewUIView: UIView {
     var frontPreviewLayer: AVCaptureVideoPreviewLayer?
     var backPreviewLayer: AVCaptureVideoPreviewLayer?
+    var backgroundSampleBufferLayer: AVSampleBufferDisplayLayer?
+    private var blurEffectView: UIVisualEffectView?
     private var frontPinchGesture: UIPinchGestureRecognizer?
     private var backPinchGesture: UIPinchGestureRecognizer?
     private weak var cameraController: CameraController?
+    private var videoDataOutput: AVCaptureVideoDataOutput?
+    private let videoDataOutputQueue = DispatchQueue(label: "VideoDataOutput", qos: .userInitiated, attributes: [], autoreleaseFrequency: .workItem)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         isUserInteractionEnabled = true
+        setupBackgroundLayer()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         isUserInteractionEnabled = true
+        setupBackgroundLayer()
+    }
+
+    private func setupBackgroundLayer() {
+        backgroundSampleBufferLayer = AVSampleBufferDisplayLayer()
+        backgroundSampleBufferLayer?.videoGravity = .resizeAspectFill
+        backgroundSampleBufferLayer?.frame = bounds
+        
+        let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
+        let flipTransform = CGAffineTransform(scaleX: -1, y: 1)
+        let combinedTransform = rotationTransform.concatenating(flipTransform)
+        backgroundSampleBufferLayer?.setAffineTransform(combinedTransform)
+        
+        if let backgroundLayer = backgroundSampleBufferLayer {
+            layer.addSublayer(backgroundLayer)
+        }
+        
+        setupBlurEffect()
+    }
+    
+    private func setupBlurEffect() {
+        let blurEffect = UIBlurEffect(style: .light) 
+        blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView?.frame = bounds
+        blurEffectView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        if let blurView = blurEffectView {
+            addSubview(blurView)
+        }
     }
 
     func setupPreviewLayers(with session: AVCaptureMultiCamSession) {
         cleanupPreviewLayers()
+        setupBackgroundLayer()
 
         frontPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
         backPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
@@ -49,6 +84,7 @@ class CameraPreviewUIView: UIView {
         backPreviewLayer?.videoGravity = .resizeAspectFill
 
         setupConnections(for: session)
+        setupVideoDataOutput(for: session)
 
         if let frontLayer = frontPreviewLayer {
             layer.addSublayer(frontLayer)
@@ -60,6 +96,38 @@ class CameraPreviewUIView: UIView {
         }
 
         setNeedsLayout()
+    }
+
+    private func setupVideoDataOutput(for session: AVCaptureMultiCamSession) {
+        guard let backCameraInput = session.inputs.compactMap({ $0 as? AVCaptureDeviceInput })
+            .first(where: { $0.device.position == .back }) else {
+            return
+        }
+
+        videoDataOutput = AVCaptureVideoDataOutput()
+        videoDataOutput?.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+        ]
+        videoDataOutput?.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
+
+        if session.canAddOutput(videoDataOutput!) {
+            session.addOutput(videoDataOutput!)
+            
+            if let videoPort = backCameraInput.ports(for: .video, sourceDeviceType: backCameraInput.device.deviceType, sourceDevicePosition: .back).first {
+                let videoConnection = AVCaptureConnection(inputPorts: [videoPort], output: videoDataOutput!)
+                
+                if session.canAddConnection(videoConnection) {
+                    session.addConnection(videoConnection)
+                    
+                    if videoConnection.isVideoOrientationSupported {
+                        videoConnection.videoOrientation = AVCaptureVideoOrientation.portrait
+                    }
+                    if videoConnection.isVideoStabilizationSupported {
+                        videoConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationMode.auto
+                    }
+                }
+            }
+        }
     }
 
     private func setupPinchGesture(for position: AVCaptureDevice.Position) {
@@ -78,7 +146,9 @@ class CameraPreviewUIView: UIView {
         guard let cameraController = cameraController else { return }
         
         let location = gesture.location(in: self)
-        let position: AVCaptureDevice.Position = location.y < bounds.height / 2 ? .front : .back
+        let position: AVCaptureDevice.Position
+        
+        position = location.x < bounds.width / 2 ? .front : .back
         
         cameraController.handlePinchGesture(gesture, forCamera: position)
     }
@@ -104,18 +174,56 @@ class CameraPreviewUIView: UIView {
     }
 
     func cleanupPreviewLayers() {
+        backgroundSampleBufferLayer?.removeFromSuperlayer()
         frontPreviewLayer?.removeFromSuperlayer()
         backPreviewLayer?.removeFromSuperlayer()
+        blurEffectView?.removeFromSuperview()
+        
+        if let output = videoDataOutput {
+            if let session = frontPreviewLayer?.session {
+                session.removeOutput(output)
+            }
+        }
+        
+        backgroundSampleBufferLayer = nil
         frontPreviewLayer = nil
         backPreviewLayer = nil
+        videoDataOutput = nil
+        blurEffectView = nil
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        let halfHeight = bounds.height / 2
-        frontPreviewLayer?.frame = CGRect(x: 0, y: 0, width: bounds.width, height: halfHeight)
-        backPreviewLayer?.frame = CGRect(x: 0, y: halfHeight, width: bounds.width, height: halfHeight)
+        backgroundSampleBufferLayer?.frame = bounds
+        let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
+        let flipTransform = CGAffineTransform(scaleX: -1, y: 1)
+        let combinedTransform = rotationTransform.concatenating(flipTransform)
+        backgroundSampleBufferLayer?.setAffineTransform(combinedTransform)
+        
+        blurEffectView?.frame = bounds
+        
+        if let cameraController = cameraController {
+            let halfWidth = bounds.width / 2
+            
+            let aspectRatio: CGFloat = 9.0 / 16.0
+            let videoHeight = halfWidth / aspectRatio
+            
+            let yOffset = (bounds.height - videoHeight) / 2
+            
+            frontPreviewLayer?.frame = CGRect(x: 0, y: yOffset, width: halfWidth, height: videoHeight)
+            backPreviewLayer?.frame = CGRect(x: halfWidth, y: yOffset, width: halfWidth, height: videoHeight)
+        }
+    }
+}
+
+extension CameraPreviewUIView: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        backgroundSampleBufferLayer?.enqueue(sampleBuffer)
+    }
+    
+    func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        print("Dropped sample buffer")
     }
 }
 
