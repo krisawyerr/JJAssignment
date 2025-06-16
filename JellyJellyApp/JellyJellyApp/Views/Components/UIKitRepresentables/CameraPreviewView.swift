@@ -27,11 +27,13 @@ class CameraPreviewUIView: UIView {
     var backPreviewLayer: AVCaptureVideoPreviewLayer?
     var backgroundSampleBufferLayer: AVSampleBufferDisplayLayer?
     private var blurEffectView: UIVisualEffectView?
-    private var frontPinchGesture: UIPinchGestureRecognizer?
-    private var backPinchGesture: UIPinchGestureRecognizer?
+    private var frontScrollGesture: UIPanGestureRecognizer?
+    private var backScrollGesture: UIPanGestureRecognizer?
     private weak var cameraController: CameraController?
     private var videoDataOutput: AVCaptureVideoDataOutput?
     private let videoDataOutputQueue = DispatchQueue(label: "VideoDataOutput", qos: .userInitiated, attributes: [], autoreleaseFrequency: .workItem)
+    private var frontGridLayer: CAShapeLayer?
+    private var backGridLayer: CAShapeLayer?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -73,9 +75,53 @@ class CameraPreviewUIView: UIView {
         }
     }
 
+    private func setupGridLayers() {
+        frontGridLayer = CAShapeLayer()
+        frontGridLayer?.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
+        frontGridLayer?.lineWidth = 1.0
+        frontGridLayer?.fillColor = nil
+        
+        backGridLayer = CAShapeLayer()
+        backGridLayer?.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
+        backGridLayer?.lineWidth = 1.0
+        backGridLayer?.fillColor = nil
+    }
+
+    private func updateGridLayers() {
+        guard let frontGridLayer = frontGridLayer,
+              let backGridLayer = backGridLayer,
+              let frontPreviewLayer = frontPreviewLayer,
+              let backPreviewLayer = backPreviewLayer else { return }
+        
+        let frontPath = UIBezierPath()
+        let frontHeight = frontPreviewLayer.frame.height
+        let quarterHeight = frontHeight / 4
+        
+        frontPath.move(to: CGPoint(x: 0, y: quarterHeight))
+        frontPath.addLine(to: CGPoint(x: frontPreviewLayer.frame.width, y: quarterHeight))
+        
+        frontPath.move(to: CGPoint(x: 0, y: frontHeight - quarterHeight))
+        frontPath.addLine(to: CGPoint(x: frontPreviewLayer.frame.width, y: frontHeight - quarterHeight))
+        
+        frontGridLayer.path = frontPath.cgPath
+        
+        let backPath = UIBezierPath()
+        let backHeight = backPreviewLayer.frame.height
+        let backQuarterHeight = backHeight / 4
+        
+        backPath.move(to: CGPoint(x: 0, y: backQuarterHeight))
+        backPath.addLine(to: CGPoint(x: backPreviewLayer.frame.width, y: backQuarterHeight))
+        
+        backPath.move(to: CGPoint(x: 0, y: backHeight - backQuarterHeight))
+        backPath.addLine(to: CGPoint(x: backPreviewLayer.frame.width, y: backHeight - backQuarterHeight))
+        
+        backGridLayer.path = backPath.cgPath
+    }
+
     func setupPreviewLayers(with session: AVCaptureMultiCamSession) {
         cleanupPreviewLayers()
         setupBackgroundLayer()
+        setupGridLayers()
 
         frontPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
         backPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
@@ -88,10 +134,16 @@ class CameraPreviewUIView: UIView {
 
         if let frontLayer = frontPreviewLayer {
             layer.addSublayer(frontLayer)
+            if let frontGridLayer = frontGridLayer {
+                frontLayer.addSublayer(frontGridLayer)
+            }
             setupPinchGesture(for: .front)
         }
         if let backLayer = backPreviewLayer {
             layer.addSublayer(backLayer)
+            if let backGridLayer = backGridLayer {
+                backLayer.addSublayer(backGridLayer)
+            }
             setupPinchGesture(for: .back)
         }
 
@@ -131,26 +183,35 @@ class CameraPreviewUIView: UIView {
     }
 
     private func setupPinchGesture(for position: AVCaptureDevice.Position) {
-        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
-        pinchGesture.delegate = self
-        addGestureRecognizer(pinchGesture)
+        let scrollGesture = UIPanGestureRecognizer(target: self, action: #selector(handleScroll(_:)))
+        scrollGesture.delegate = self
+        addGestureRecognizer(scrollGesture)
         
         if position == .front {
-            frontPinchGesture = pinchGesture
+            frontScrollGesture = scrollGesture
         } else {
-            backPinchGesture = pinchGesture
+            backScrollGesture = scrollGesture
         }
     }
 
-    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+    @objc private func handleScroll(_ gesture: UIPanGestureRecognizer) {
         guard let cameraController = cameraController else { return }
         
         let location = gesture.location(in: self)
-        let position: AVCaptureDevice.Position
+        let position: AVCaptureDevice.Position = location.x < bounds.width / 2 ? .front : .back
         
-        position = location.x < bounds.width / 2 ? .front : .back
+        let translation = gesture.translation(in: self)
+        let zoomDelta = -translation.y / 100.0 
         
-        cameraController.handlePinchGesture(gesture, forCamera: position)
+        switch gesture.state {
+        case .changed:
+            let currentZoom = position == .front ? cameraController.frontZoomFactor : cameraController.backZoomFactor
+            let newZoom = currentZoom + zoomDelta
+            cameraController.setZoomFactor(newZoom, forCamera: position)
+            gesture.setTranslation(.zero, in: self)
+        default:
+            break
+        }
     }
 
     func setCameraController(_ controller: CameraController) {
@@ -190,6 +251,8 @@ class CameraPreviewUIView: UIView {
         backPreviewLayer = nil
         videoDataOutput = nil
         blurEffectView = nil
+        frontGridLayer = nil
+        backGridLayer = nil
     }
 
     override func layoutSubviews() {
@@ -213,6 +276,11 @@ class CameraPreviewUIView: UIView {
             
             frontPreviewLayer?.frame = CGRect(x: 0, y: yOffset, width: halfWidth, height: videoHeight)
             backPreviewLayer?.frame = CGRect(x: halfWidth, y: yOffset, width: halfWidth, height: videoHeight)
+            
+            frontGridLayer?.frame = frontPreviewLayer?.bounds ?? .zero
+            backGridLayer?.frame = backPreviewLayer?.bounds ?? .zero
+            
+            updateGridLayers()
         }
     }
 }

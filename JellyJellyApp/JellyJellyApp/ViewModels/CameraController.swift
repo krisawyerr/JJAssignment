@@ -580,23 +580,6 @@ class CameraController: NSObject, ObservableObject {
         }
     }
 
-    func handlePinchGesture(_ gesture: UIPinchGestureRecognizer, forCamera position: AVCaptureDevice.Position) {
-        switch gesture.state {
-        case .began:
-            if position == .front {
-                frontInitialZoom = frontZoomFactor
-            } else {
-                backInitialZoom = backZoomFactor
-            }
-        case .changed:
-            let scale = gesture.scale
-            let newZoomFactor = position == .front ? frontInitialZoom * scale : backInitialZoom * scale
-            setZoomFactor(newZoomFactor, forCamera: position)
-        default:
-            break
-        }
-    }
-
     func uploadVideoToFirebase(video: RecordedVideo, context: NSManagedObjectContext) async throws {
         guard let mergedVideoURL = video.mergedVideoURL,
               let videoURL = URL(string: mergedVideoURL) else {
