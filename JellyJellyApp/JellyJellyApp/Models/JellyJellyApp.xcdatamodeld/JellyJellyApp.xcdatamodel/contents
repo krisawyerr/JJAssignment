@@ -19,5 +19,6 @@
         <attribute name="saved" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="firebaseStorageURL" optional="YES" attributeType="String"/>
         <attribute name="isSideBySide" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="isFrontOnly" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
     </entity>
 </model>

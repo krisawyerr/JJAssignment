@@ -67,10 +67,13 @@ struct CreateView: View {
                                 showingPreview = false
                             }
                             cameraController.retakeVideo()
-                        }, isSideBySide: !cameraController.useTopBottomLayout
+                        }, isSideBySide: cameraController.cameraLayoutMode == .sideBySide,
+                        isFrontOnly: cameraController.cameraLayoutMode == .frontOnly,
+                        cameraSwitchTimestamps: cameraController.cameraSwitchTimestamps,
+                        initialCameraPosition: cameraController.initialCameraPosition
                     )
                 } else {
-                    CameraPreviewView(controller: cameraController)
+                    CameraPreviewView(controller: cameraController, cameraLayoutMode: cameraController.cameraLayoutMode)
                 }
                 
                 if !showingPreview {
@@ -81,10 +84,10 @@ struct CreateView: View {
                                 
                                 Button(action: {
                                     withAnimation {
-                                        cameraController.useTopBottomLayout.toggle()
+                                        cameraController.cameraLayoutMode = cameraController.cameraLayoutMode.next
                                     }
                                 }) {
-                                    Image(systemName: cameraController.useTopBottomLayout ? "rectangle.split.1x2" : "rectangle.split.2x1")
+                                    Image(systemName: cameraController.cameraLayoutMode.icon)
                                         .font(.system(size: 24))
                                         .foregroundColor(.white)
                                         .padding(12)

@@ -111,7 +111,36 @@ class CameraController: NSObject, ObservableObject {
     @Published var backPreviewURL: URL?
     @Published var frontZoomFactor: CGFloat = 1.0
     @Published var backZoomFactor: CGFloat = 1.0
-    @Published var useTopBottomLayout: Bool = true
+    
+    enum CameraLayoutMode: CaseIterable {
+        case topBottom
+        case sideBySide
+        case frontOnly
+        
+        var icon: String {
+            switch self {
+            case .topBottom:
+                return "rectangle.split.1x2"
+            case .sideBySide:
+                return "rectangle.split.2x1"
+            case .frontOnly:
+                return "camera"
+            }
+        }
+        
+        var next: CameraLayoutMode {
+            switch self {
+            case .topBottom:
+                return .sideBySide
+            case .sideBySide:
+                return .frontOnly
+            case .frontOnly:
+                return .topBottom
+            }
+        }
+    }
+    
+    @Published var cameraLayoutMode: CameraLayoutMode = .topBottom
     
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
@@ -129,6 +158,9 @@ class CameraController: NSObject, ObservableObject {
     private var storedContext: NSManagedObjectContext?
     private var processingStartTime: CFAbsoluteTime = 0
     private var lastRecordedVideo: RecordedVideo?
+    var cameraSwitchTimestamps: [CFAbsoluteTime] = []
+    private var recordingStartTime: CFAbsoluteTime = 0
+    var initialCameraPosition: AVCaptureDevice.Position = .front
     
     var onVideoProcessed: (() -> Void)?
     
@@ -362,6 +394,14 @@ class CameraController: NSObject, ObservableObject {
         
         recordingCompletionCount = 0
         secondsRemaining = maxRecordingTime
+        cameraSwitchTimestamps.removeAll()
+        recordingStartTime = CFAbsoluteTimeGetCurrent()
+        
+        if cameraLayoutMode == .frontOnly {
+            initialCameraPosition = previewView?.activeCameraInFrontOnlyMode ?? .front
+        } else {
+            initialCameraPosition = .front 
+        }
         
         let timestamp = Date().timeIntervalSince1970
         let tempDir = FileManager.default.temporaryDirectory
@@ -868,6 +908,189 @@ class CameraController: NSObject, ObservableObject {
         
         try await exportSession.export(to: outputURL, as: .mp4)
     }
+
+    private func processFrontOnlyVideo(context: NSManagedObjectContext) {
+        guard let frontURL = self.frontURL,
+              let backURL = self.backURL else {
+            return
+        }
+        
+        guard FileManager.default.fileExists(atPath: frontURL.path),
+              FileManager.default.fileExists(atPath: backURL.path) else {
+            print("Video files do not exist")
+            return
+        }
+        
+        let tempDir = FileManager.default.temporaryDirectory
+        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let finalOutputURL = docsDir.appendingPathComponent("front_only_with_flips_\(Date().timeIntervalSince1970).mp4")
+        
+        Task {
+            do {
+                let newRecording = RecordedVideo(context: context)
+                newRecording.createdAt = Date()
+                newRecording.frontVideoURL = frontURL.absoluteString
+                newRecording.backVideoURL = backURL.absoluteString
+                newRecording.isFrontOnly = true
+                try context.save()
+                
+                try await self.createFrontOnlyVideoWithFlips(frontVideoURL: frontURL, backVideoURL: backURL, outputURL: finalOutputURL)
+                
+                newRecording.mergedVideoURL = finalOutputURL.absoluteString
+                try context.save()
+                
+                try? FileManager.default.removeItem(at: frontURL)
+                try? FileManager.default.removeItem(at: backURL)
+                
+                let endTime = CFAbsoluteTimeGetCurrent()
+                let totalProcessingTime = (endTime - self.processingStartTime) * 1000
+                print("Total front-only processing time: \(String(format: "%.1f", totalProcessingTime))ms")
+                
+                await MainActor.run {
+                    self.mergedVideoURL = finalOutputURL
+                    self.onVideoProcessed?()
+                }
+                
+                try await self.uploadVideoToFirebase(video: newRecording, context: context)
+                
+            } catch {
+                print("Front-only video processing failed: \(error.localizedDescription)")
+                try? FileManager.default.removeItem(at: finalOutputURL)
+            }
+        }
+    }
+    
+    private func createFrontOnlyVideoWithFlips(frontVideoURL: URL, backVideoURL: URL, outputURL: URL) async throws {
+        let frontAsset = AVURLAsset(url: frontVideoURL)
+        let backAsset = AVURLAsset(url: backVideoURL)
+        
+        let composition = AVMutableComposition()
+        guard let frontTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let backTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw NSError(domain: "CompositionError", code: -1)
+        }
+        
+        let frontTracks = try await frontAsset.loadTracks(withMediaType: .video)
+        let backTracks = try await backAsset.loadTracks(withMediaType: .video)
+        
+        guard let frontAssetTrack = frontTracks.first,
+              let backAssetTrack = backTracks.first else {
+            throw NSError(domain: "TrackError", code: -1)
+        }
+        
+        let frontDuration = try await frontAsset.load(.duration)
+        let backDuration = try await backAsset.load(.duration)
+        let totalDuration = min(frontDuration, backDuration)
+        
+        var switchTimes: [CMTime] = []
+        
+        if !cameraSwitchTimestamps.isEmpty {
+            for timestamp in cameraSwitchTimestamps {
+                let cmTime = CMTime(seconds: timestamp, preferredTimescale: 600)
+                if cmTime < totalDuration {
+                    switchTimes.append(cmTime)
+                }
+            }
+        } else {
+            let segmentDuration = CMTime(seconds: 2.0, preferredTimescale: 600)
+            var currentTime = segmentDuration
+            while currentTime < totalDuration {
+                switchTimes.append(currentTime)
+                currentTime = currentTime + segmentDuration
+            }
+        }
+        
+        var allTimes: [CMTime] = [.zero]
+        allTimes.append(contentsOf: switchTimes)
+        allTimes.append(totalDuration)
+        
+        try frontTrack.insertTimeRange(
+            CMTimeRange(start: .zero, duration: totalDuration),
+            of: frontAssetTrack,
+            at: .zero
+        )
+        
+        try backTrack.insertTimeRange(
+            CMTimeRange(start: .zero, duration: totalDuration),
+            of: backAssetTrack,
+            at: .zero
+        )
+        
+        let audioTracks = try await frontAsset.loadTracks(withMediaType: .audio)
+        if let audioTrack = audioTracks.first {
+            let audioCompTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+            try audioCompTrack?.insertTimeRange(
+                CMTimeRange(start: .zero, duration: totalDuration),
+                of: audioTrack,
+                at: .zero
+            )
+        }
+        
+        let videoComposition = AVMutableVideoComposition()
+        let naturalSize = try await frontAssetTrack.load(.naturalSize)
+        videoComposition.renderSize = CGSize(width: naturalSize.height, height: naturalSize.width)
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        
+        var instructions: [AVMutableVideoCompositionInstruction] = []
+        
+        for i in 0..<(allTimes.count - 1) {
+            let startTime = allTimes[i]
+            let endTime = allTimes[i + 1]
+            let segmentDuration = endTime - startTime
+            
+            let instruction = AVMutableVideoCompositionInstruction()
+            instruction.timeRange = CMTimeRange(start: startTime, duration: segmentDuration)
+            
+            let frontLayerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: frontTrack)
+            let backLayerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: backTrack)
+            
+            let rotation = CGAffineTransform(rotationAngle: .pi / 2)
+            let translation = CGAffineTransform(translationX: naturalSize.height, y: 0)
+            let transform = rotation.concatenating(translation)
+            
+            frontLayerInstruction.setTransform(transform, at: startTime)
+            backLayerInstruction.setTransform(transform, at: startTime)
+            
+            let isFrontSegment: Bool
+            if initialCameraPosition == .front {
+                isFrontSegment = i % 2 == 0
+            } else {
+                isFrontSegment = i % 2 == 1
+            }
+            
+            if isFrontSegment {
+                frontLayerInstruction.setOpacity(1.0, at: startTime)
+                backLayerInstruction.setOpacity(0.0, at: startTime)
+            } else {
+                frontLayerInstruction.setOpacity(0.0, at: startTime)
+                backLayerInstruction.setOpacity(1.0, at: startTime)
+            }
+            
+            instruction.layerInstructions = [frontLayerInstruction, backLayerInstruction]
+            instructions.append(instruction)
+        }
+        
+        videoComposition.instructions = instructions
+        
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw NSError(domain: "ExportError", code: -2)
+        }
+        
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.videoComposition = videoComposition
+        exportSession.shouldOptimizeForNetworkUse = true
+        
+        try await exportSession.export(to: outputURL, as: .mp4)
+    }
+    
+    func recordCameraSwitch() {
+        if isRecording {
+            let switchTime = CFAbsoluteTimeGetCurrent() - recordingStartTime
+            cameraSwitchTimestamps.append(switchTime)
+            print("Camera switch recorded at: \(switchTime)s")
+        }
+    }
 }
 
 extension CameraController: AVCaptureFileOutputRecordingDelegate {
@@ -891,10 +1114,13 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
                     self.processingStartTime = CFAbsoluteTimeGetCurrent()
                     print("Starting video processing at: \(self.processingStartTime)")
                     Task {
-                        if self.useTopBottomLayout {
+                        switch self.cameraLayoutMode {
+                        case .topBottom:
                             self.processVideos(context: context)
-                        } else {
+                        case .sideBySide:
                             self.processVideosSideBySide(context: context)
+                        case .frontOnly:
+                            self.processFrontOnlyVideo(context: context)
                         }
                     }
                 } else {
