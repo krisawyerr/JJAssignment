@@ -41,7 +41,6 @@ class CameraPreviewUIView: UIView {
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     var cameraLayoutMode: CameraController.CameraLayoutMode = .topBottom
     var activeCameraInFrontOnlyMode: AVCaptureDevice.Position = .front
-    private var doubleTapGesture: UITapGestureRecognizer?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -107,8 +106,6 @@ class CameraPreviewUIView: UIView {
 
         setNeedsLayout()
         layoutIfNeeded()
-        
-        setupDoubleTapGesture()
     }
 
     private func setupVideoDataOutput(for session: AVCaptureMultiCamSession) {
@@ -305,17 +302,8 @@ class CameraPreviewUIView: UIView {
             self?.layoutIfNeeded()
         }
     }
-
-    private func setupDoubleTapGesture() {
-        doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
-        doubleTapGesture?.numberOfTapsRequired = 2
-        doubleTapGesture?.delegate = self
-        if let gesture = doubleTapGesture {
-            addGestureRecognizer(gesture)
-        }
-    }
     
-    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+    func flipCameraInFrontOnlyMode() {
         guard cameraLayoutMode == .frontOnly else { return }
         
         activeCameraInFrontOnlyMode = activeCameraInFrontOnlyMode == .front ? .back : .front

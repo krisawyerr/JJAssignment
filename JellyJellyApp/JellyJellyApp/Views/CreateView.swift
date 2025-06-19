@@ -101,6 +101,27 @@ struct CreateView: View {
 
                         Spacer()
                         
+                        if cameraController.cameraLayoutMode == .frontOnly {
+                            HStack {
+                                Spacer()
+                                
+                                Button(action: {
+                                    cameraController.flipCameraInFrontOnlyMode()
+                                }) {
+                                    Image(systemName: "camera.rotate")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.white)
+                                        .padding(12)
+                                        .background(Color.black.opacity(0.6))
+                                        .clipShape(Circle())
+                                }
+                                .padding(.trailing, 20)
+                            }
+                            .padding(.bottom, 20)
+                        }
+
+                        Spacer()
+                        
                         Button(action: {
                             if cameraController.isRecording {
                                 isProcessingVideo = true

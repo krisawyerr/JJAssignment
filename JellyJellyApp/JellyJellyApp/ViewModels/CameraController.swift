@@ -561,7 +561,7 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.renderSize = CGSize(width: cropWidth, height: naturalSize.height)
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPreset640x480) else {
             throw NSError(domain: "Export session failed", code: -3)
         }
         
@@ -627,7 +627,7 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
         videoComposition.instructions = [instruction]
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPreset640x480) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -664,7 +664,7 @@ class CameraController: NSObject, ObservableObject {
         try videoCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: videoTrack, at: .zero)
         try audioCompTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: audioTrack, at: .zero)
         
-        guard let exportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPreset640x480) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -838,7 +838,7 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.renderSize = CGSize(width: naturalSize.height, height: naturalSize.width)
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPreset640x480) else {
             throw NSError(domain: "Export session failed", code: -3)
         }
         
@@ -897,7 +897,7 @@ class CameraController: NSObject, ObservableObject {
         videoComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
         videoComposition.instructions = [instruction]
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPreset640x480) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -1072,7 +1072,7 @@ class CameraController: NSObject, ObservableObject {
         
         videoComposition.instructions = instructions
         
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPreset640x480) else {
             throw NSError(domain: "ExportError", code: -2)
         }
         
@@ -1090,6 +1090,10 @@ class CameraController: NSObject, ObservableObject {
             cameraSwitchTimestamps.append(switchTime)
             print("Camera switch recorded at: \(switchTime)s")
         }
+    }
+    
+    func flipCameraInFrontOnlyMode() {
+        previewView?.flipCameraInFrontOnlyMode()
     }
 }
 
