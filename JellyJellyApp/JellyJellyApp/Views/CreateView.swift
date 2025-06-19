@@ -10,7 +10,8 @@ import AVFoundation
 import CoreData
 
 struct CreateView: View {
-    @StateObject private var cameraController = CameraController()
+    @EnvironmentObject var appState: AppState
+    @ObservedObject var cameraController: CameraController
     @Environment(\.managedObjectContext) private var context
     @Binding var selectedTab: Tab
     @Binding var isProcessingVideo: Bool
@@ -21,6 +22,7 @@ struct CreateView: View {
     var body: some View {
         VStack {
             ZStack {
+                Color.black
                 if showingPreview, let frontURL = cameraController.frontPreviewURL, let backURL = cameraController.backPreviewURL {
                     VideoPlayerPreviewView(
                         frontURL: frontURL,
@@ -170,16 +172,7 @@ struct CreateView: View {
                 }
             }
             .onAppear {
-                pauseAllVideos()
                 cameraController.setupCamera()
-
-//                cameraController.onVideoProcessed = {
-//                    isProcessingVideo = false
-//                    selectedTab = .library
-//                }
-            }
-            .onDisappear {
-                cameraController.stopCamera()
             }
             .onChange(of: cameraController.isRecording) { _, isRecording in
                 if isRecording {
@@ -221,9 +214,4 @@ struct CreateView: View {
         
         try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
     }
-}
-
-#Preview {
-    CreateView(selectedTab: .constant(.create), isProcessingVideo: .constant(false))
-        .environmentObject(AppState())
 }

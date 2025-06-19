@@ -18,6 +18,12 @@ struct CameraPreviewView: UIViewRepresentable {
         controller.setPreviewView(view)
         view.setCameraController(controller)
         view.cameraLayoutMode = cameraLayoutMode
+        if controller.session.isRunning {
+            DispatchQueue.main.async {
+                view.setupPreviewLayers(with: controller.session)
+                controller.isPreviewReady = true
+            }
+        }
         return view
     }
 

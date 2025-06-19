@@ -15,6 +15,8 @@ class AppState: ObservableObject {
     @Published var wasInitiallySetup = false
     @Published var isLoading = true
     
+    @Published var cameraController = CameraController()
+    
     private let startTime = Date()
     let shareablePlayerStore = GenericPlayerManagerStore<ShareableItem>()
     let recordedPlayerStore = GenericPlayerManagerStore<RecordedVideo>()

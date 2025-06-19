@@ -231,7 +231,10 @@ class FrontOnlyVideoPlayerController: UIViewController {
         if !cameraSwitchTimestamps.isEmpty {
             updateCameraBasedOnTimestamps(currentTime: frontTime)
         } else {
-            updateCameraWithFixedIntervals(currentTime: frontTime)
+            if currentCamera != initialCameraPosition {
+                currentCamera = initialCameraPosition
+                updateCameraVisibility()
+            }
         }
     }
     
@@ -256,23 +259,6 @@ class FrontOnlyVideoPlayerController: UIViewController {
         if newCamera != currentCamera || newSegmentIndex != currentSegmentIndex {
             currentCamera = newCamera
             currentSegmentIndex = newSegmentIndex
-            updateCameraVisibility()
-        }
-    }
-    
-    private func updateCameraWithFixedIntervals(currentTime: Double) {
-        let switchInterval: Double = 2.0
-        let segment = Int(currentTime / switchInterval)
-        let newCamera: AVCaptureDevice.Position
-        
-        if initialCameraPosition == .front {
-            newCamera = segment % 2 == 0 ? .front : .back
-        } else {
-            newCamera = segment % 2 == 0 ? .back : .front
-        }
-        
-        if newCamera != currentCamera {
-            currentCamera = newCamera
             updateCameraVisibility()
         }
     }

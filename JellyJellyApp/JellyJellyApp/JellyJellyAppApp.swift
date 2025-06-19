@@ -25,6 +25,8 @@ struct JellyJellyAppApp: App {
     @StateObject var appState = AppState()
     @State private var isLoading = true
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             if isLoading {
@@ -40,6 +42,17 @@ struct JellyJellyAppApp: App {
                 ContentView()
                     .environmentObject(appState)
                     .environment(\.managedObjectContext, appState.viewContext)
+            }
+        }
+        .onChange(of: scenePhase) {
+            let cameraController = appState.cameraController
+            switch scenePhase {
+            case .background:
+                cameraController.stopCamera()
+            case .active:
+                cameraController.setupCamera()
+            default:
+                break
             }
         }
     }
