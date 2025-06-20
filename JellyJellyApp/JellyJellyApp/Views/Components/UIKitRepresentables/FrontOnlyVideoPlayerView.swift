@@ -147,6 +147,8 @@ class FrontOnlyVideoPlayerController: UIViewController {
         frontLayer.videoGravity = .resizeAspectFill
         backLayer.videoGravity = .resizeAspectFill
         
+        frontLayer.transform = CATransform3DMakeScale(-1, 1, 1)
+        
         view.layer.addSublayer(frontLayer)
         view.layer.addSublayer(backLayer)
         

@@ -224,7 +224,6 @@ struct LibraryView: View {
                 }
             } catch {
                 print("Error deleting video: \(error.localizedDescription)")
-                // Still try to delete locally even if Firebase deletion fails
                 if let videoURLString = video.mergedVideoURL,
                    let videoURL = URL(string: videoURLString),
                    let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {

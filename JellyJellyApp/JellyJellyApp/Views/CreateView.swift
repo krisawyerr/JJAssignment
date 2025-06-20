@@ -117,9 +117,6 @@ struct CreateView: View {
                     }
                 }
             }
-            .onAppear {
-                cameraController.setupCamera()
-            }
             .onChange(of: cameraController.isRecording) { _, isRecording in
                 if isRecording {
                     progress = 0.0
@@ -201,11 +198,6 @@ struct CreateView: View {
             }
         }
         .animation(nil, value: showingPreview)
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                cameraController.setupCamera()
-            }
-        }
     }
 
     private func pauseAllVideos() {

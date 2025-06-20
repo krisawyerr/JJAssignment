@@ -47,7 +47,9 @@ struct JellyJellyAppApp: App {
         .onChange(of: scenePhase) {
             print(scenePhase)
             let cameraController = appState.cameraController
-            cameraController.setupCamera()
+            if scenePhase == .active {
+                cameraController.setupCamera()
+            }
         }
     }
 }

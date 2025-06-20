@@ -630,8 +630,9 @@ class CameraController: NSObject, ObservableObject {
         let rotation = CGAffineTransform(rotationAngle: .pi / 2)
         let move1 = CGAffineTransform(translationX: videoHeight, y: 0)
         let move2 = CGAffineTransform(translationX: videoHeight, y: videoWidth)
+        let flip = CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -videoHeight, y: 0)
         
-        let transform1 = rotation.concatenating(move1)
+        let transform1 = rotation.concatenating(move1).concatenating(flip)
         let transform2 = rotation.concatenating(move2)
         
         let layerInstruction1 = AVMutableVideoCompositionLayerInstruction(assetTrack: track1)
@@ -904,7 +905,8 @@ class CameraController: NSObject, ObservableObject {
         instruction.timeRange = timeRange
         
         let frontLayerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: frontTrack)
-        frontLayerInstruction.setTransform(CGAffineTransform.identity, at: .zero)
+        let flip = CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -frontSize.width, y: 0)
+        frontLayerInstruction.setTransform(flip, at: .zero)
         
         let backLayerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: backTrack)
         let backTransform = CGAffineTransform(translationX: frontSize.width, y: 0)
@@ -1071,6 +1073,9 @@ class CameraController: NSObject, ObservableObject {
             }
             
             if isFrontSegment {
+                let flip = CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -naturalSize.height, y: 0)
+                let frontTransformWithFlip = transform.concatenating(flip)
+                frontLayerInstruction.setTransform(frontTransformWithFlip, at: startTime)
                 frontLayerInstruction.setOpacity(1.0, at: startTime)
                 backLayerInstruction.setOpacity(0.0, at: startTime)
             } else {
