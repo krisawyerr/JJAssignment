@@ -167,6 +167,7 @@ class CameraController: NSObject, ObservableObject {
     
     func setPreviewView(_ view: CameraPreviewUIView) {
         self.previewView = view
+        setupCamera()
     }
     
     func resetPreviewState() {
@@ -195,11 +196,12 @@ class CameraController: NSObject, ObservableObject {
         let mergedURLToDelete = mergedVideoURL
         let contextToUse = storedContext
         
-        resetPreviewState()
-        
-        if session.isRunning {
-            session.stopRunning()
-        }
+        frontURL = nil
+        backURL = nil
+        mergedVideoURL = nil
+        frontPreviewURL = nil
+        backPreviewURL = nil
+        immediatePreviewURL = nil
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
@@ -239,11 +241,6 @@ class CameraController: NSObject, ObservableObject {
             }
             if let mergedURL = mergedURLToDelete {
                 try? FileManager.default.removeItem(at: mergedURL)
-            }
-            
-            DispatchQueue.main.async {
-                self.resetSession()
-                self.setupCamera()
             }
         }
     }

@@ -28,6 +28,7 @@ struct CameraPreviewView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: CameraPreviewUIView, context: Context) {
+        controller.setPreviewView(uiView)
         if uiView.cameraLayoutMode != cameraLayoutMode {
             uiView.setLayoutMode(cameraLayoutMode: cameraLayoutMode)
         }

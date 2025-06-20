@@ -13,42 +13,47 @@ struct VideoPlayerPreviewView: View {
     
     var body: some View {
         ZStack {
-            Color.black.edgesIgnoringSafeArea(.all)
+            Color("Background").edgesIgnoringSafeArea(.all)
             
-            if isFrontOnly {
-                FrontOnlyVideoPlayerView(frontURL: frontURL, backURL: backURL, cameraSwitchTimestamps: cameraSwitchTimestamps, initialCameraPosition: initialCameraPosition)
-            } else if isSideBySide {
-                SideBySideVideoPlayerView(frontURL: frontURL, backURL: backURL)
-            } else {
-                DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
-            }
-            
-            VStack {
-                Spacer()
-                
-                HStack(spacing: 20) {
-                    Spacer()
-                    Button(action: onBack) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(Color.black.opacity(0.5))
-                            .clipShape(Circle())
-                    }
-                    
-                    Button(action: onSave) {
-                        Text("Save Jelly")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 200, height: 50)
-                            .background(Color("JellyPrimary"))
-                            .cornerRadius(22)
-                    }
-                    Spacer()
+            ZStack {
+                if isFrontOnly {
+                    FrontOnlyVideoPlayerView(frontURL: frontURL, backURL: backURL, cameraSwitchTimestamps: cameraSwitchTimestamps, initialCameraPosition: initialCameraPosition)
+                } else if isSideBySide {
+                    SideBySideVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                } else {
+                    DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
                 }
-                .padding()
+                
+                VStack {
+                    Spacer()
+                    
+                    HStack(spacing: 20) {
+                        Spacer()
+                        Button(action: onBack) {
+                            Image(systemName: "arrow.left")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                                .frame(width: 50, height: 50)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        }
+                        
+                        Button(action: onSave) {
+                            Text("Save Jelly")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 200, height: 50)
+                                .background(Color("JellyPrimary"))
+                                .cornerRadius(22)
+                        }
+                        Spacer()
+                    }
+                    .padding()
+                }
             }
+            .cornerRadius(16)
+            .safeAreaInset(edge: .leading) { Spacer().frame(width: 8) }
+            .safeAreaInset(edge: .trailing) { Spacer().frame(width: 8) }
         }
     }
 } 

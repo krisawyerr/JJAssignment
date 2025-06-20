@@ -45,15 +45,9 @@ struct JellyJellyAppApp: App {
             }
         }
         .onChange(of: scenePhase) {
+            print(scenePhase)
             let cameraController = appState.cameraController
-            switch scenePhase {
-            case .background:
-                cameraController.stopCamera()
-            case .active:
-                cameraController.setupCamera()
-            default:
-                break
-            }
+            cameraController.setupCamera()
         }
     }
 }
