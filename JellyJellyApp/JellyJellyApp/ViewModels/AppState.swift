@@ -22,6 +22,16 @@ class AppState: ObservableObject {
     let recordedPlayerStore = GenericPlayerManagerStore<RecordedVideo>()
     let likedPlayerStore = GenericPlayerManagerStore<LikedItem>()
     
+    private var currentVideoIndex: Int = 0
+    private var wasPlayingBeforeBackground = false
+    private var currentVideoType: VideoType = .shareable
+    
+    enum VideoType {
+        case shareable
+        case liked
+        case recorded
+    }
+    
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "JellyJellyApp")
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
@@ -129,6 +139,160 @@ class AppState: ObservableObject {
         } catch {
             print("Error checking if item is liked: \(error)")
             return false
+        }
+    }
+        
+    func updateCurrentVideoIndex(_ index: Int, type: VideoType = .shareable) {
+        currentVideoIndex = index
+        currentVideoType = type
+    }
+    
+    func pauseVideoPlayback() {
+        switch currentVideoType {
+        case .shareable:
+            pauseShareableVideos()
+        case .liked:
+            pauseLikedVideos()
+        case .recorded:
+            pauseRecordedVideos()
+        }
+    }
+    
+    func resumeVideoPlayback() {
+        switch currentVideoType {
+        case .shareable:
+            resumeShareableVideos()
+        case .liked:
+            resumeLikedVideos()
+        case .recorded:
+            resumeRecordedVideos()
+        }
+    }
+    
+    private func pauseShareableVideos() {
+        guard !shareableItems.isEmpty else { return }
+        
+        if currentVideoIndex < shareableItems.count {
+            let currentItem = shareableItems[currentVideoIndex]
+            let manager = shareablePlayerStore.getManager(for: currentItem)
+            wasPlayingBeforeBackground = manager.isPlaying
+            
+            for item in shareableItems {
+                let manager = shareablePlayerStore.getManager(for: item)
+                manager.pause()
+            }
+        }
+        
+        print("Paused shareable video playback - was playing: \(wasPlayingBeforeBackground)")
+    }
+    
+    private func resumeShareableVideos() {
+        guard !shareableItems.isEmpty else { return }
+        
+        if currentVideoIndex < shareableItems.count && wasPlayingBeforeBackground {
+            let currentItem = shareableItems[currentVideoIndex]
+            let manager = shareablePlayerStore.getManager(for: currentItem)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                manager.play()
+                print("Resumed shareable video playback for index: \(self.currentVideoIndex)")
+            }
+        }
+    }
+    
+    private func pauseLikedVideos() {
+        let fetchRequest: NSFetchRequest<LikedItem> = LikedItem.fetchRequest()
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \LikedItem.createdAt, ascending: false)]
+        
+        do {
+            let likedVideos = try viewContext.fetch(fetchRequest)
+            guard !likedVideos.isEmpty else { return }
+            
+            if currentVideoIndex < likedVideos.count {
+                let currentItem = likedVideos[currentVideoIndex]
+                let manager = likedPlayerStore.getManager(for: currentItem)
+                wasPlayingBeforeBackground = manager.isPlaying
+                
+                for item in likedVideos {
+                    let manager = likedPlayerStore.getManager(for: item)
+                    manager.pause()
+                }
+            }
+            
+            print("Paused liked video playback - was playing: \(wasPlayingBeforeBackground)")
+        } catch {
+            print("Error fetching liked videos: \(error)")
+        }
+    }
+    
+    private func resumeLikedVideos() {
+        let fetchRequest: NSFetchRequest<LikedItem> = LikedItem.fetchRequest()
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \LikedItem.createdAt, ascending: false)]
+        
+        do {
+            let likedVideos = try viewContext.fetch(fetchRequest)
+            guard !likedVideos.isEmpty else { return }
+            
+            if currentVideoIndex < likedVideos.count && wasPlayingBeforeBackground {
+                let currentItem = likedVideos[currentVideoIndex]
+                let manager = likedPlayerStore.getManager(for: currentItem)
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    manager.play()
+                    print("Resumed liked video playback for index: \(self.currentVideoIndex)")
+                }
+            }
+        } catch {
+            print("Error fetching liked videos: \(error)")
+        }
+    }
+    
+    private func pauseRecordedVideos() {
+        let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "saved == YES")
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \RecordedVideo.createdAt, ascending: false)]
+        
+        do {
+            let recordedVideos = try viewContext.fetch(fetchRequest)
+            guard !recordedVideos.isEmpty else { return }
+            
+            if currentVideoIndex < recordedVideos.count {
+                let currentItem = recordedVideos[currentVideoIndex]
+                let manager = recordedPlayerStore.getManager(for: currentItem)
+                wasPlayingBeforeBackground = manager.isPlaying
+                
+                for item in recordedVideos {
+                    let manager = recordedPlayerStore.getManager(for: item)
+                    manager.pause()
+                }
+            }
+            
+            print("Paused recorded video playback - was playing: \(wasPlayingBeforeBackground)")
+        } catch {
+            print("Error fetching recorded videos: \(error)")
+        }
+    }
+    
+    private func resumeRecordedVideos() {
+        let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "saved == YES")
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \RecordedVideo.createdAt, ascending: false)]
+        
+        do {
+            let recordedVideos = try viewContext.fetch(fetchRequest)
+            guard !recordedVideos.isEmpty else { return }
+            
+            if currentVideoIndex < recordedVideos.count && wasPlayingBeforeBackground {
+                let currentItem = recordedVideos[currentVideoIndex]
+                let manager = recordedPlayerStore.getManager(for: currentItem)
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    manager.play()
+                    print("Resumed recorded video playback for index: \(self.currentVideoIndex)")
+                }
+            }
+        } catch {
+            print("Error fetching recorded videos: \(error)")
         }
     }
 }

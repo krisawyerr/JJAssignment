@@ -66,6 +66,13 @@ struct GenericScrollerView<T: VideoPlayable>: View {
             pauseAllVideos()
         }
         .onChange(of: currentIndex) { _, newIndex in
+            if T.self == ShareableItem.self {
+                appState.updateCurrentVideoIndex(newIndex, type: .shareable)
+            } else if T.self == LikedItem.self {
+                appState.updateCurrentVideoIndex(newIndex, type: .liked)
+            } else if T.self == RecordedVideo.self {
+                appState.updateCurrentVideoIndex(newIndex, type: .recorded)
+            }
             preloadAdjacentVideos(around: newIndex)
         }
     }
@@ -102,6 +109,14 @@ struct GenericScrollerView<T: VideoPlayable>: View {
         let firstItem = videoItems[currentIndex]
         let manager = playerStore.getManager(for: firstItem)
         manager.play()
+        
+        if T.self == ShareableItem.self {
+            appState.updateCurrentVideoIndex(currentIndex, type: .shareable)
+        } else if T.self == LikedItem.self {
+            appState.updateCurrentVideoIndex(currentIndex, type: .liked)
+        } else if T.self == RecordedVideo.self {
+            appState.updateCurrentVideoIndex(currentIndex, type: .recorded)
+        }
         
         if videoItems.count > 1 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {

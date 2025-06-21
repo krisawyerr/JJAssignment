@@ -24,6 +24,7 @@ struct JellyJellyAppApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var appState = AppState()
     @State private var isLoading = true
+    @State private var wasInBackground = false
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -44,11 +45,28 @@ struct JellyJellyAppApp: App {
                     .environment(\.managedObjectContext, appState.viewContext)
             }
         }
-        .onChange(of: scenePhase) {
-            print(scenePhase)
-            let cameraController = appState.cameraController
-            if scenePhase == .active {
+        .onChange(of: scenePhase) { _, newPhase in
+            print("Scene phase changed to: \(newPhase)")
+            
+            switch newPhase {
+            case .active:
+                let cameraController = appState.cameraController
                 cameraController.setupCamera()
+                
+                if wasInBackground {
+                    appState.resumeVideoPlayback()
+                }
+                wasInBackground = false
+                
+            case .inactive:
+                break
+                
+            case .background:
+                wasInBackground = true
+                appState.pauseVideoPlayback()
+                
+            @unknown default:
+                break
             }
         }
     }

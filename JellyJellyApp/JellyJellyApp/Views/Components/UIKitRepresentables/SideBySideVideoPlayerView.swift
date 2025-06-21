@@ -34,6 +34,8 @@ class SideBySideVideoPlayerController: UIViewController {
     private var backItemObserver: NSKeyValueObservation?
     private var frontEndObserver: NSObjectProtocol?
     private var backEndObserver: NSObjectProtocol?
+    private var appWillResignActiveObserver: NSObjectProtocol?
+    private var appDidBecomeActiveObserver: NSObjectProtocol?
     
     init(frontURL: URL, backURL: URL) {        
         self.frontPlayer = AVPlayer(url: frontURL)
@@ -52,6 +54,7 @@ class SideBySideVideoPlayerController: UIViewController {
         
         setupReadinessObservers()
         setupEndObservers()
+        setupAppLifecycleObservers()
         
         if let frontAsset = frontPlayer.currentItem?.asset {
             Task {
@@ -124,6 +127,33 @@ class SideBySideVideoPlayerController: UIViewController {
         ) { [weak self] _ in
             self?.handleVideoEnd()
         }
+    }
+    
+    private func setupAppLifecycleObservers() {
+        appWillResignActiveObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleAppWillResignActive()
+        }
+        
+        appDidBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleAppDidBecomeActive()
+        }
+    }
+    
+    private func handleAppWillResignActive() {
+        frontPlayer.pause()
+        backPlayer.pause()
+    }
+    
+    private func handleAppDidBecomeActive() {
+        restartVideos()
     }
     
     private func handleVideoEnd() {
@@ -288,6 +318,12 @@ class SideBySideVideoPlayerController: UIViewController {
         }
         if let backEnd = backEndObserver {
             NotificationCenter.default.removeObserver(backEnd)
+        }
+        if let appWillResign = appWillResignActiveObserver {
+            NotificationCenter.default.removeObserver(appWillResign)
+        }
+        if let appDidBecome = appDidBecomeActiveObserver {
+            NotificationCenter.default.removeObserver(appDidBecome)
         }
         
         checkTimer?.invalidate()
