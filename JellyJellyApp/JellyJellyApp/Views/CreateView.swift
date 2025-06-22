@@ -19,6 +19,7 @@ struct CreateView: View {
     @StateObject private var playerStore = GenericPlayerManagerStore<RecordedVideo>()
     @State private var showingPreview = false
     @Environment(\.scenePhase) private var scenePhase
+    @State private var isLongPressing = false
 
     var body: some View {
         VStack {
@@ -71,14 +72,11 @@ struct CreateView: View {
 
                     Spacer()
                     
-                    Button(action: {
-                        if cameraController.isRecording {
-                            isProcessingVideo = true
-                            cameraController.stopRecording()
-                        } else {
-                            cameraController.startRecording(context: context)
-                        }
-                    }) {
+                    ZStack {
+                        Color.clear
+                            .frame(width: 150, height: 120)
+                            .contentShape(Rectangle())
+                        
                         ZStack {
                             JellyfishShape()
                                 .stroke(Color.white, lineWidth: 3)
@@ -90,31 +88,48 @@ struct CreateView: View {
                                 .frame(width: 100, height: 80)
                                 .animation(.linear(duration: 0.1), value: progress)
                             
-                            if !cameraController.isRecording {
+                            if !cameraController.isRecording && !isLongPressing {
                                 JellyfishShape()
                                     .fill(Color("JellyPrimary").opacity(0.3))
                                     .frame(width: 100, height: 80)
                             }
                         }
+                        .scaleEffect(cameraController.isRecording || isLongPressing ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: cameraController.isRecording || isLongPressing)
                     }
-                    .scaleEffect(cameraController.isRecording ? 1.1 : 1.0)
-                    .animation(.easeInOut(duration: 0.2), value: cameraController.isRecording)
                     .padding(.bottom, 50)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                if !cameraController.isRecording {
+                                    isLongPressing = true
+                                    cameraController.startRecording(context: context)
+                                }
+                            }
+                            .onEnded { _ in
+                                isLongPressing = false
+                                if cameraController.isRecording {
+                                    isProcessingVideo = true
+                                    cameraController.stopRecording()
+                                }
+                            }
+                    )
                     
-                    if cameraController.isRecording {
-                        Button(action: {
-                            cameraController.undoRecording()
-                            isProcessingVideo = false
-                        }) {
-                            Text("Undo")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 120, height: 44)
-                                .background(Color.red)
-                                .cornerRadius(22)
-                        }
-                        .padding(.bottom, 20)
-                    }
+//                    if cameraController.isRecording {
+//                        Button(action: {
+//                            cameraController.undoRecording()
+//                            isProcessingVideo = false
+//                            isLongPressing = false
+//                        }) {
+//                            Text("Undo")
+//                                .font(.system(size: 18, weight: .semibold))
+//                                .foregroundColor(.white)
+//                                .frame(width: 120, height: 44)
+//                                .background(Color.red)
+//                                .cornerRadius(22)
+//                        }
+//                        .padding(.bottom, 20)
+//                    }
                 }
             }
             .onChange(of: cameraController.isRecording) { _, isRecording in
@@ -122,6 +137,7 @@ struct CreateView: View {
                     progress = 0.0
                 } else {
                     progress = 0.0
+                    isLongPressing = false
                 }
             }
             .onChange(of: cameraController.secondsRemaining) { _, secondsRemaining in
@@ -129,6 +145,7 @@ struct CreateView: View {
                     progress = CGFloat(15000 - secondsRemaining) / 15000.0
                     if secondsRemaining <= 0 {
                         isProcessingVideo = true
+                        isLongPressing = false
                     }
                 }
             }
@@ -142,8 +159,8 @@ struct CreateView: View {
             .cornerRadius(16)
         }
         .safeAreaInset(edge: .top) { Spacer().frame(height: 0) }
-        .safeAreaInset(edge: .leading) { Spacer().frame(height: 5) }
-        .safeAreaInset(edge: .trailing) { Spacer().frame(height: 5) }
+        .safeAreaInset(edge: .leading) { Spacer().frame(width: 5) }
+        .safeAreaInset(edge: .trailing) { Spacer().frame(width: 5) }
         .fullScreenCover(isPresented: $showingPreview) {
             if let frontURL = cameraController.frontPreviewURL, let backURL = cameraController.backPreviewURL {
                 VideoPlayerPreviewView(

@@ -30,19 +30,24 @@ struct JellyJellyAppApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if isLoading {
-                LaunchScreenView()
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            withAnimation(.easeInOut(duration: 0.5)) {
-                                isLoading = false
-                            }
-                        }
-                    }
-            } else {
+            ZStack {
                 ContentView()
                     .environmentObject(appState)
                     .environment(\.managedObjectContext, appState.viewContext)
+                
+                if isLoading {
+                    LaunchScreenView()
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.5), value: isLoading)
+                        .animation(.easeInOut(duration: 0.5), value: appState.cameraController.isPreviewReady)
+                }
+            }
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        isLoading = false
+                    }
+                }
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

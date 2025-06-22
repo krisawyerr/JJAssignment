@@ -112,6 +112,7 @@ class CameraController: NSObject, ObservableObject {
     @Published var backPreviewURL: URL?
     @Published var frontZoomFactor: CGFloat = 1.0
     @Published var backZoomFactor: CGFloat = 1.0
+    @Published var isPaused = false
     
     enum CameraLayoutMode: CaseIterable {
         case topBottom
@@ -407,8 +408,40 @@ class CameraController: NSObject, ObservableObject {
         }
     }
     
+    func pauseCamera() {
+        guard session.isRunning && !isPaused else { return }
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            self.session.stopRunning()
+            
+            DispatchQueue.main.async {
+                self.isPaused = true
+                print("Camera paused")
+            }
+        }
+    }
+    
+    func resumeCamera() {
+        guard !session.isRunning && isPaused else { return }
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            self.session.startRunning()
+            
+            DispatchQueue.main.async {
+                self.isPaused = false
+                print("Camera resumed")
+            }
+        }
+    }
+    
     func startRecording(context: NSManagedObjectContext) {
-        guard !isRecording else { return }
+        guard !isRecording else { 
+            return 
+        }
         
         storedContext = context
         
@@ -445,7 +478,9 @@ class CameraController: NSObject, ObservableObject {
     }
     
     func stopRecording() {
-        guard isRecording else { return }
+        guard isRecording else { 
+            return 
+        }
         
         stopTimer()
         

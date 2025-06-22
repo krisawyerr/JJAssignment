@@ -15,22 +15,41 @@ struct VideoPlayerPreviewView: View {
         ZStack {
             Color("Background").edgesIgnoringSafeArea(.all)
             
-            ZStack {
-                if isFrontOnly {
-                    FrontOnlyVideoPlayerView(frontURL: frontURL, backURL: backURL, cameraSwitchTimestamps: cameraSwitchTimestamps, initialCameraPosition: initialCameraPosition)
-                } else if isSideBySide {
-                    SideBySideVideoPlayerView(frontURL: frontURL, backURL: backURL)
-                } else {
-                    DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
+            VStack {
+                ZStack {
+                    if isFrontOnly {
+                        FrontOnlyVideoPlayerView(frontURL: frontURL, backURL: backURL, cameraSwitchTimestamps: cameraSwitchTimestamps, initialCameraPosition: initialCameraPosition)
+                            .cornerRadius(16)
+                    } else if isSideBySide {
+                        SideBySideVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                            .cornerRadius(16)
+                    } else {
+                        DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
+                            .cornerRadius(16)
+                    }
+                    
+                    VStack {
+                        HStack(spacing: 20) {
+                            Button(action: onBack) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                                    .background(Color.black.opacity(0.5))
+                                    .clipShape(Circle())
+                            }
+                            Spacer()
+                        }
+                        Spacer()
+                    }
+                    .padding()
                 }
                 
                 VStack {
-                    Spacer()
                     
-                    HStack(spacing: 20) {
-                        Spacer()
-                        Button(action: onBack) {
-                            Image(systemName: "arrow.left")
+                    HStack(spacing: 10) {
+                        Button(action: onSave) {
+                            Image(systemName: "arrow.down")
                                 .font(.system(size: 24))
                                 .foregroundColor(.white)
                                 .frame(width: 50, height: 50)
@@ -42,16 +61,24 @@ struct VideoPlayerPreviewView: View {
                             Text("Save Jelly")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                                .frame(width: 200, height: 50)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(22)
+                        }
+                        
+                        Button(action: onSave) {
+                            Text("Post Jelly")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
                                 .background(Color("JellyPrimary"))
                                 .cornerRadius(22)
                         }
-                        Spacer()
                     }
-                    .padding()
                 }
             }
-            .cornerRadius(16)
             .safeAreaInset(edge: .leading) { Spacer().frame(width: 8) }
             .safeAreaInset(edge: .trailing) { Spacer().frame(width: 8) }
         }

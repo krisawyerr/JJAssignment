@@ -16,7 +16,7 @@ enum Tab {
 }
 
 struct ContentView: View {
-    @State private var selectedTab: Tab = .home
+    @State private var selectedTab: Tab = .create
     @State private var animateHome = false
     @State private var animateCam = false
     @State private var animateGallery = false
@@ -142,6 +142,18 @@ struct ContentView: View {
 //                        }
 //                    )
 //            }
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            handleTabChange(newTab)
+        }
+    }
+    
+    private func handleTabChange(_ newTab: Tab) {
+        switch newTab {
+        case .create:
+            appState.cameraController.resumeCamera()
+        case .home, .library:
+            appState.cameraController.pauseCamera()
         }
     }
 }
