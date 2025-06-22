@@ -114,22 +114,6 @@ struct CreateView: View {
                                 }
                             }
                     )
-                    
-//                    if cameraController.isRecording {
-//                        Button(action: {
-//                            cameraController.undoRecording()
-//                            isProcessingVideo = false
-//                            isLongPressing = false
-//                        }) {
-//                            Text("Undo")
-//                                .font(.system(size: 18, weight: .semibold))
-//                                .foregroundColor(.white)
-//                                .frame(width: 120, height: 44)
-//                                .background(Color.red)
-//                                .cornerRadius(22)
-//                        }
-//                        .padding(.bottom, 20)
-//                    }
                 }
             }
             .onChange(of: cameraController.isRecording) { _, isRecording in
@@ -149,8 +133,8 @@ struct CreateView: View {
                     }
                 }
             }
-            .onChange(of: cameraController.frontPreviewURL) { _, url in
-                if url != nil && cameraController.backPreviewURL != nil {
+            .onChange(of: cameraController.mergedVideoURL) { _, url in
+                if url != nil {
                     withAnimation {
                         showingPreview = true
                     }
@@ -162,56 +146,29 @@ struct CreateView: View {
         .safeAreaInset(edge: .leading) { Spacer().frame(width: 5) }
         .safeAreaInset(edge: .trailing) { Spacer().frame(width: 5) }
         .fullScreenCover(isPresented: $showingPreview) {
-            if let frontURL = cameraController.frontPreviewURL, let backURL = cameraController.backPreviewURL {
+            if let mergedURL = cameraController.mergedVideoURL {
                 VideoPlayerPreviewView(
-                    frontURL: frontURL,
-                    backURL: backURL,
+                    mergedVideoURL: mergedURL,
                     onSave: {
-                        if let mergedURL = cameraController.mergedVideoURL {
-                            let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
-                            fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
-                            
-                            if let video = try? context.fetch(fetchRequest).first {
-                                video.saved = true
-                                try? context.save()
-                                
-                                withAnimation {
-                                    showingPreview = false
-//                                    cameraController.resetPreviewState()
-                                }
-                                selectedTab = .library
-                            }
-                        } else {
-                            cameraController.onVideoProcessed = { [weak cameraController] in
-                                guard let controller = cameraController else { return }
-                                if let mergedURL = controller.mergedVideoURL {
-                                    let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
-                                    fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
-                                    
-                                    if let video = try? context.fetch(fetchRequest).first {
-                                        video.saved = true
-                                        try? context.save()
-                                        
-                                        withAnimation {
-                                            showingPreview = false
-//                                            controller.resetPreviewState()
-                                        }
-                                        selectedTab = .library
-                                    }
-                                }
-                                controller.onVideoProcessed = nil
-                            }
+                        let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+                        fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
+                        if let video = try? context.fetch(fetchRequest).first {
+                            video.saved = true
+                            try? context.save()
+                            withAnimation { showingPreview = false }
+                            selectedTab = .library
                         }
                     },
                     onBack: {
-                        showingPreview = false
-                         cameraController.retakeVideo()
-                    },
-                    isSideBySide: cameraController.cameraLayoutMode == .sideBySide,
-                    isFrontOnly: cameraController.cameraLayoutMode == .frontOnly,
-                    cameraSwitchTimestamps: cameraController.cameraSwitchTimestamps,
-                    initialCameraPosition: cameraController.initialCameraPosition
+                        withAnimation { showingPreview = false }
+                    }
                 )
+                .onAppear {
+                    cameraController.pauseCamera()
+                }
+                .onDisappear {
+                    cameraController.resumeCamera()
+                }
             }
         }
         .animation(nil, value: showingPreview)

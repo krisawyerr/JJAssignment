@@ -125,23 +125,6 @@ struct ContentView: View {
                 .padding(.top, 15)
                 .background(Color("Background"))
             }
-            
-//            if isProcessingVideo {
-//                Color.black.opacity(0.9)
-//                    .ignoresSafeArea()
-//                    .overlay(
-//                        VStack(spacing: 20) {
-//                            Text("Processing video...")
-//                                .font(.custom("Ranchers-Regular", size: 25))
-//                                .foregroundColor(.white)
-//                                .kerning(1.5)
-//                                .padding(.bottom, 10)
-//                            ProgressView()
-//                                .scaleEffect(2)
-//                                .tint(.white)
-//                        }
-//                    )
-//            }
         }
         .onChange(of: selectedTab) { _, newTab in
             handleTabChange(newTab)

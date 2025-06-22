@@ -36,7 +36,7 @@ class VideoPlayerViewModel: ObservableObject {
         currentIndex = 0
         playCurrent()
     }
-    
+
     private func configureAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
@@ -97,13 +97,13 @@ class VideoPlayerViewModel: ObservableObject {
         player.seek(to: cmTime)
         currentTime = time
     }
-    
+
     func stop() {
         player.pause()
         isPlaying = false
         currentTime = 0
     }
-    
+
     func start() {
         player.play()
         isPlaying = true

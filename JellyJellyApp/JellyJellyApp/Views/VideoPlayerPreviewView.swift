@@ -2,14 +2,19 @@ import SwiftUI
 import AVKit
 
 struct VideoPlayerPreviewView: View {
-    let frontURL: URL
-    let backURL: URL
+    let mergedVideoURL: URL
     let onSave: () -> Void
     let onBack: () -> Void
-    @State var isSideBySide: Bool
-    @State var isFrontOnly: Bool
-    let cameraSwitchTimestamps: [Double]
-    let initialCameraPosition: AVCaptureDevice.Position
+    
+    @State private var player: AVPlayer
+    @State private var playerLooper: Any?
+    
+    init(mergedVideoURL: URL, onSave: @escaping () -> Void, onBack: @escaping () -> Void) {
+        self.mergedVideoURL = mergedVideoURL
+        self.onSave = onSave
+        self.onBack = onBack
+        _player = State(initialValue: AVPlayer(url: mergedVideoURL))
+    }
     
     var body: some View {
         ZStack {
@@ -17,16 +22,21 @@ struct VideoPlayerPreviewView: View {
             
             VStack {
                 ZStack {
-                    if isFrontOnly {
-                        FrontOnlyVideoPlayerView(frontURL: frontURL, backURL: backURL, cameraSwitchTimestamps: cameraSwitchTimestamps, initialCameraPosition: initialCameraPosition)
-                            .cornerRadius(16)
-                    } else if isSideBySide {
-                        SideBySideVideoPlayerView(frontURL: frontURL, backURL: backURL)
-                            .cornerRadius(16)
-                    } else {
-                        DualVideoPlayerView(frontURL: frontURL, backURL: backURL)
-                            .cornerRadius(16)
-                    }
+                    VideoPlayerView(player: player)
+                        .cornerRadius(16)
+                        .onAppear {
+                            setupLooping()
+                        }
+                        .onDisappear {
+                            player.pause()
+                            player.replaceCurrentItem(with: nil)
+                            NotificationCenter.default.removeObserver(self)
+                            do {
+                                try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+                            } catch {
+                                print("Failed to deactivate AVAudioSession: \(error)")
+                            }
+                        }
                     
                     VStack {
                         HStack(spacing: 20) {
@@ -46,7 +56,6 @@ struct VideoPlayerPreviewView: View {
                 }
                 
                 VStack {
-                    
                     HStack(spacing: 10) {
                         Button(action: onSave) {
                             Image(systemName: "arrow.down")
@@ -82,5 +91,13 @@ struct VideoPlayerPreviewView: View {
             .safeAreaInset(edge: .leading) { Spacer().frame(width: 8) }
             .safeAreaInset(edge: .trailing) { Spacer().frame(width: 8) }
         }
+    }
+    
+    private func setupLooping() {
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+            player.seek(to: .zero)
+            player.play()
+        }
+        player.play()
     }
 } 

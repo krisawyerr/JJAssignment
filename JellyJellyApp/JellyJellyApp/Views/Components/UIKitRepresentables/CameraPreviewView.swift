@@ -43,7 +43,8 @@ class CameraPreviewUIView: UIView {
     private var frontScrollGesture: UIPanGestureRecognizer?
     private var backScrollGesture: UIPanGestureRecognizer?
     private weak var cameraController: CameraController?
-    private var videoDataOutput: AVCaptureVideoDataOutput?
+    private var frontVideoDataOutput: AVCaptureVideoDataOutput?
+    private var backVideoDataOutput: AVCaptureVideoDataOutput?
     private let videoDataOutputQueue = DispatchQueue(label: "VideoDataOutput", qos: .userInitiated, attributes: [], autoreleaseFrequency: .workItem)
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     var cameraLayoutMode: CameraController.CameraLayoutMode = .topBottom
@@ -116,31 +117,36 @@ class CameraPreviewUIView: UIView {
     }
 
     private func setupVideoDataOutput(for session: AVCaptureMultiCamSession) {
-        guard let backCameraInput = session.inputs.compactMap({ $0 as? AVCaptureDeviceInput })
-            .first(where: { $0.device.position == .back }) else {
-            return
-        }
-
-        videoDataOutput = AVCaptureVideoDataOutput()
-        videoDataOutput?.videoSettings = [
-            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
-        ]
-        videoDataOutput?.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
-
-        if session.canAddOutput(videoDataOutput!) {
-            session.addOutput(videoDataOutput!)
-            
-            if let videoPort = backCameraInput.ports(for: .video, sourceDeviceType: backCameraInput.device.deviceType, sourceDevicePosition: .back).first {
-                let videoConnection = AVCaptureConnection(inputPorts: [videoPort], output: videoDataOutput!)
-                
-                if session.canAddConnection(videoConnection) {
-                    session.addConnection(videoConnection)
-                    
-                    if videoConnection.isVideoRotationAngleSupported(.pi/2) {
-                        videoConnection.videoRotationAngle = .pi/2
+        if let frontCameraInput = session.inputs.compactMap({ $0 as? AVCaptureDeviceInput })
+            .first(where: { $0.device.position == .front }) {
+            frontVideoDataOutput = AVCaptureVideoDataOutput()
+            frontVideoDataOutput?.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+            ]
+            frontVideoDataOutput?.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
+            if session.canAddOutput(frontVideoDataOutput!) {
+                session.addOutput(frontVideoDataOutput!)
+                if let videoPort = frontCameraInput.ports(for: .video, sourceDeviceType: frontCameraInput.device.deviceType, sourceDevicePosition: .front).first {
+                    let videoConnection = AVCaptureConnection(inputPorts: [videoPort], output: frontVideoDataOutput!)
+                    if session.canAddConnection(videoConnection) {
+                        session.addConnection(videoConnection)
                     }
-                    if videoConnection.isVideoStabilizationSupported {
-                        videoConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationMode.auto
+                }
+            }
+        }
+        if let backCameraInput = session.inputs.compactMap({ $0 as? AVCaptureDeviceInput })
+            .first(where: { $0.device.position == .back }) {
+            backVideoDataOutput = AVCaptureVideoDataOutput()
+            backVideoDataOutput?.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+            ]
+            backVideoDataOutput?.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
+            if session.canAddOutput(backVideoDataOutput!) {
+                session.addOutput(backVideoDataOutput!)
+                if let videoPort = backCameraInput.ports(for: .video, sourceDeviceType: backCameraInput.device.deviceType, sourceDevicePosition: .back).first {
+                    let videoConnection = AVCaptureConnection(inputPorts: [videoPort], output: backVideoDataOutput!)
+                    if session.canAddConnection(videoConnection) {
+                        session.addConnection(videoConnection)
                     }
                 }
             }
@@ -213,8 +219,14 @@ class CameraPreviewUIView: UIView {
         backPreviewLayer?.removeFromSuperlayer()
         blurEffectView?.removeFromSuperview()
         
-        if let output = videoDataOutput {
+        if let output = frontVideoDataOutput {
             if let session = frontPreviewLayer?.session {
+                session.removeOutput(output)
+            }
+        }
+        
+        if let output = backVideoDataOutput {
+            if let session = backPreviewLayer?.session {
                 session.removeOutput(output)
             }
         }
@@ -222,7 +234,8 @@ class CameraPreviewUIView: UIView {
         backgroundSampleBufferLayer = nil
         frontPreviewLayer = nil
         backPreviewLayer = nil
-        videoDataOutput = nil
+        frontVideoDataOutput = nil
+        backVideoDataOutput = nil
         blurEffectView = nil
     }
 
@@ -325,9 +338,14 @@ class CameraPreviewUIView: UIView {
 
 extension CameraPreviewUIView: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        if #available(iOS 18.0, *) {
+        if output === frontVideoDataOutput {
+            cameraController?.processFrontSampleBuffer(sampleBuffer)
+        } else if output === backVideoDataOutput {
+            cameraController?.processBackSampleBuffer(sampleBuffer)
+        }
+        if #available(iOS 18.0, *), output === backVideoDataOutput {
             backgroundSampleBufferLayer?.sampleBufferRenderer.enqueue(sampleBuffer)
-        } else {
+        } else if output === backVideoDataOutput {
             backgroundSampleBufferLayer?.enqueue(sampleBuffer)
         }
     }
