@@ -52,24 +52,24 @@ struct JellyJellyAppApp: App {
         }
         .onChange(of: scenePhase) { _, newPhase in
             print("Scene phase changed to: \(newPhase)")
-            
+            let cameraController = appState.cameraController
             switch newPhase {
             case .active:
-                let cameraController = appState.cameraController
-                cameraController.setupCamera()
-                
                 if wasInBackground {
+                    if appState.selectedTab == .create && !appState.isShowingPreview {
+                        cameraController.resumeCamera()
+                    }
                     appState.resumeVideoPlayback()
+                } else {
+                    cameraController.setupCamera()
                 }
                 wasInBackground = false
-                
             case .inactive:
                 break
-                
             case .background:
                 wasInBackground = true
+                cameraController.pauseCamera()
                 appState.pauseVideoPlayback()
-                
             @unknown default:
                 break
             }

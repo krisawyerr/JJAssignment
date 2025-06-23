@@ -16,16 +16,15 @@ enum Tab {
 }
 
 struct ContentView: View {
-    @State private var selectedTab: Tab = .create
+    @EnvironmentObject var appState: AppState
     @State private var animateHome = false
     @State private var animateCam = false
     @State private var animateGallery = false
     @State private var isProcessingVideo = false
-    @EnvironmentObject var appState: AppState
     
     var body: some View {
         ZStack {
-            TabView(selection: $selectedTab) {
+            TabView(selection: $appState.selectedTab) {
                 HomeView()
                     .tabItem {
                         Image(systemName: "house.fill")
@@ -34,7 +33,7 @@ struct ContentView: View {
                     .tag(Tab.home)
                     .background(Color("Background"))
 
-                CreateView(cameraController: appState.cameraController, selectedTab: $selectedTab, isProcessingVideo: $isProcessingVideo)
+                CreateView(cameraController: appState.cameraController, selectedTab: $appState.selectedTab, isProcessingVideo: $isProcessingVideo)
                     .environmentObject(appState)
                     .tabItem {
                         Image(systemName: "plus.circle.fill")
@@ -43,7 +42,7 @@ struct ContentView: View {
                     .tag(Tab.create)
                     .background(Color("Background"))
                 
-                LibraryView(selectedTab: $selectedTab)
+                LibraryView(selectedTab: $appState.selectedTab)
                     .tabItem {
                         Image(systemName: "photo.fill")
                         Text("Library")
@@ -59,7 +58,7 @@ struct ContentView: View {
                     VStack {
                         Button(action: {
                             triggerHaptic(.soft)
-                            selectedTab = .home
+                            appState.selectedTab = .home
                             animateHome = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                                 animateHome = false
@@ -68,8 +67,8 @@ struct ContentView: View {
                             TabbarLottieView(
                                 animationName: "home",
                                 play: animateHome,
-                                strokeColor: (selectedTab == .home ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
-                                fillColor: (selectedTab == .home ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
+                                strokeColor: (appState.selectedTab == .home ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
+                                fillColor: (appState.selectedTab == .home ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
                             )
                             .frame(width: 35, height: 35)
                         }
@@ -81,7 +80,7 @@ struct ContentView: View {
                     VStack {
                         Button(action: {
                             triggerHaptic(.soft)
-                            selectedTab = .create
+                            appState.selectedTab = .create
                             animateCam = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                                 animateCam = false
@@ -90,8 +89,8 @@ struct ContentView: View {
                             TabbarLottieView(
                                 animationName: "cam",
                                 play: animateCam,
-                                strokeColor: (selectedTab == .create ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
-                                fillColor: (selectedTab == .create ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
+                                strokeColor: (appState.selectedTab == .create ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
+                                fillColor: (appState.selectedTab == .create ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
                             )
                             .frame(width: 35, height: 35)
                         }
@@ -103,7 +102,7 @@ struct ContentView: View {
                     VStack {
                         Button(action: {
                             triggerHaptic(.soft)
-                            selectedTab = .library
+                            appState.selectedTab = .library
                             animateGallery = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                                 animateGallery = false
@@ -112,8 +111,8 @@ struct ContentView: View {
                             TabbarLottieView(
                                 animationName: "gallery",
                                 play: animateGallery,
-                                strokeColor: (selectedTab == .library ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
-                                fillColor: (selectedTab == .library ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
+                                strokeColor: (appState.selectedTab == .library ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!,
+                                fillColor: (appState.selectedTab == .library ? UIColor(named: "JellyPrimary") : UIColor(named: "JellySecondary"))!
                             )
                             .frame(width: 35, height: 35)
                         }
@@ -126,7 +125,7 @@ struct ContentView: View {
                 .background(Color("Background"))
             }
         }
-        .onChange(of: selectedTab) { _, newTab in
+        .onChange(of: appState.selectedTab) { _, newTab in
             handleTabChange(newTab)
         }
     }

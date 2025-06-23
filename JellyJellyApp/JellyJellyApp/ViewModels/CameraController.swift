@@ -185,6 +185,25 @@ class CameraController: NSObject, ObservableObject {
     private let writerSessionLock = NSLock()
     private var audioDataOutput: AVCaptureAudioDataOutput?
     private var audioInputWriter: AVAssetWriterInput?
+    private var hasPreWarmedWriter = false
+    private let frameBufferLock = NSLock()
+    
+    func preWarmWriter() {
+        guard !hasPreWarmedWriter else { return }
+        hasPreWarmedWriter = true
+        let tempDir = FileManager.default.temporaryDirectory
+        let dummyURL = tempDir.appendingPathComponent("prewarm_dummy.mp4")
+        try? FileManager.default.removeItem(at: dummyURL)
+        outputURL = dummyURL
+        setupWriter()
+        assetWriter?.cancelWriting()
+        assetWriter = nil
+        videoInput = nil
+        audioInputWriter = nil
+        pixelBufferAdaptor = nil
+        outputURL = nil
+        isWriterReady = false
+    }
     
     func setPreviewView(_ view: CameraPreviewUIView) {
         self.previewView = view
@@ -207,7 +226,27 @@ class CameraController: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 previewView.setupPreviewLayers(with: self.session)
                 self.isPreviewReady = true
+                self.preWarmWriter()
             }
+        }
+    }
+    
+    func clearMergedVideo() {
+        let mergedURLToDelete = mergedVideoURL
+        mergedVideoURL = nil
+        
+        if let context = storedContext, let mergedURL = mergedURLToDelete {
+            let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedURL.absoluteString)
+            
+            if let video = try? context.fetch(fetchRequest).first {
+                context.delete(video)
+                try? context.save()
+            }
+        }
+        
+        if let mergedURL = mergedURLToDelete {
+            try? FileManager.default.removeItem(at: mergedURL)
         }
     }
     
@@ -373,6 +412,7 @@ class CameraController: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 self.previewView?.setupPreviewLayers(with: self.session)
                 self.isPreviewReady = true
+                self.preWarmWriter()
             }
         }
     }
@@ -549,8 +589,10 @@ class CameraController: NSObject, ObservableObject {
         isWriterReady = true
         isAudioReady = true
         audioSessionStarted = false
+        frameBufferLock.lock()
         frontFrameBuffer.removeAll()
         backFrameBuffer.removeAll()
+        frameBufferLock.unlock()
     }
     
     private func finishWriter() {
@@ -596,24 +638,29 @@ class CameraController: NSObject, ObservableObject {
     func processFrontSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
         guard isWriterReady else { return }
         let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        frameBufferLock.lock()
         frontFrameBuffer[time] = sampleBuffer
         lastFrontTime = time
+        frameBufferLock.unlock()
         tryToMergeFrame(at: time)
     }
     
     func processBackSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
         guard isWriterReady else { return }
         let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        frameBufferLock.lock()
         backFrameBuffer[time] = sampleBuffer
         lastBackTime = time
+        frameBufferLock.unlock()
         tryToMergeFrame(at: time)
     }
     
     private func tryToMergeFrame(at time: CMTime) {
-        guard let frontTime = lastFrontTime, let backTime = lastBackTime else { return }
-        let tolerance = CMTime(value: 1, timescale: 30) 
+        frameBufferLock.lock()
+        guard let frontTime = lastFrontTime, let backTime = lastBackTime else { frameBufferLock.unlock(); return }
+        let tolerance = CMTime(value: 1, timescale: 30)
         if abs(frontTime.seconds - backTime.seconds) < tolerance.seconds {
-            guard let frontBuffer = frontFrameBuffer[frontTime], let backBuffer = backFrameBuffer[backTime] else { return }
+            guard let frontBuffer = frontFrameBuffer[frontTime], let backBuffer = backFrameBuffer[backTime] else { frameBufferLock.unlock(); return }
             writerSessionLock.lock()
             if startTime == nil {
                 assetWriter?.startSession(atSourceTime: frontTime)
@@ -624,6 +671,7 @@ class CameraController: NSObject, ObservableObject {
             frontFrameBuffer.removeValue(forKey: frontTime)
             backFrameBuffer.removeValue(forKey: backTime)
         }
+        frameBufferLock.unlock()
     }
     
     private func compositeAndWrite(frontBuffer: CMSampleBuffer, backBuffer: CMSampleBuffer, at time: CMTime) {

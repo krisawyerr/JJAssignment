@@ -351,7 +351,7 @@ extension CameraPreviewUIView: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
     
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        print("Dropped sample buffer")
+        
     }
 }
 

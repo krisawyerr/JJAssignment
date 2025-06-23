@@ -17,7 +17,6 @@ struct CreateView: View {
     @Binding var isProcessingVideo: Bool
     @State private var progress: CGFloat = 0.0
     @StateObject private var playerStore = GenericPlayerManagerStore<RecordedVideo>()
-    @State private var showingPreview = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var isLongPressing = false
 
@@ -136,7 +135,7 @@ struct CreateView: View {
             .onChange(of: cameraController.mergedVideoURL) { _, url in
                 if url != nil {
                     withAnimation {
-                        showingPreview = true
+                        appState.isShowingPreview = true
                     }
                 }
             }
@@ -145,7 +144,7 @@ struct CreateView: View {
         .safeAreaInset(edge: .top) { Spacer().frame(height: 0) }
         .safeAreaInset(edge: .leading) { Spacer().frame(width: 5) }
         .safeAreaInset(edge: .trailing) { Spacer().frame(width: 5) }
-        .fullScreenCover(isPresented: $showingPreview) {
+        .fullScreenCover(isPresented: $appState.isShowingPreview) {
             if let mergedURL = cameraController.mergedVideoURL {
                 VideoPlayerPreviewView(
                     mergedVideoURL: mergedURL,
@@ -155,12 +154,13 @@ struct CreateView: View {
                         if let video = try? context.fetch(fetchRequest).first {
                             video.saved = true
                             try? context.save()
-                            withAnimation { showingPreview = false }
+                            withAnimation { appState.isShowingPreview = false }
                             selectedTab = .library
                         }
                     },
                     onBack: {
-                        withAnimation { showingPreview = false }
+                        withAnimation { appState.isShowingPreview = false }
+                        cameraController.clearMergedVideo()
                     }
                 )
                 .onAppear {
@@ -171,7 +171,7 @@ struct CreateView: View {
                 }
             }
         }
-        .animation(nil, value: showingPreview)
+        .animation(nil, value: appState.isShowingPreview)
     }
 
     private func pauseAllVideos() {

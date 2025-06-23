@@ -17,6 +17,9 @@ class AppState: ObservableObject {
     
     @Published var cameraController = CameraController()
     
+    @Published var selectedTab: Tab = .create
+    @Published var isShowingPreview = false
+    
     private let startTime = Date()
     let shareablePlayerStore = GenericPlayerManagerStore<ShareableItem>()
     let recordedPlayerStore = GenericPlayerManagerStore<RecordedVideo>()
