@@ -154,6 +154,15 @@ struct CreateView: View {
                         if let video = try? context.fetch(fetchRequest).first {
                             video.saved = true
                             try? context.save()
+                            
+                            Task {
+                                do {
+                                    try await cameraController.uploadVideoToFirebase(video: video, context: context)
+                                } catch {
+                                    print("Error uploading video to Firebase: \(error.localizedDescription)")
+                                }
+                            }
+                            
                             withAnimation { appState.isShowingPreview = false }
                             selectedTab = .library
                         }

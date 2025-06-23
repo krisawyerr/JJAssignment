@@ -765,25 +765,25 @@ class CameraController: NSObject, ObservableObject {
     }
     
     func setZoomFactor(_ factor: CGFloat, forCamera position: AVCaptureDevice.Position) {
-        guard let device = position == .front ? frontCamera : backCamera else { return }
+        // guard let device = position == .front ? frontCamera : backCamera else { return }
         
-        do {
-            try device.lockForConfiguration()
-            let maxZoom = device.activeFormat.videoMaxZoomFactor
-            let clampedFactor = min(max(factor, 1.0), maxZoom)
+        // do {
+        //     try device.lockForConfiguration()
+        //     let maxZoom = device.activeFormat.videoMaxZoomFactor
+        //     let clampedFactor = min(max(factor, 1.0), maxZoom)
             
-            if position == .front {
-                frontZoomFactor = clampedFactor
-                device.videoZoomFactor = clampedFactor
-            } else {
-                backZoomFactor = clampedFactor
-                device.videoZoomFactor = clampedFactor
-            }
+        //     if position == .front {
+        //         frontZoomFactor = clampedFactor
+        //         device.videoZoomFactor = clampedFactor
+        //     } else {
+        //         backZoomFactor = clampedFactor
+        //         device.videoZoomFactor = clampedFactor
+        //     }
             
-            device.unlockForConfiguration()
-        } catch {
-            print("Error setting zoom factor: \(error.localizedDescription)")
-        }
+        //     device.unlockForConfiguration()
+        // } catch {
+        //     print("Error setting zoom factor: \(error.localizedDescription)")
+        // }
     }
     
     func uploadVideoToFirebase(video: RecordedVideo, context: NSManagedObjectContext) async throws {

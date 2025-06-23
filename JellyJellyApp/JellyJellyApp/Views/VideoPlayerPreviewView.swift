@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import Photos
 
 struct VideoPlayerPreviewView: View {
     let mergedVideoURL: URL
@@ -8,6 +9,9 @@ struct VideoPlayerPreviewView: View {
     
     @State private var player: AVPlayer
     @State private var playerLooper: Any?
+    @State private var isSavingVideo = false
+    @State private var showSaveSuccess = false
+    @State private var showPhotoLibraryPermissionAlert = false
     
     init(mergedVideoURL: URL, onSave: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.mergedVideoURL = mergedVideoURL
@@ -57,7 +61,7 @@ struct VideoPlayerPreviewView: View {
                 
                 VStack {
                     HStack(spacing: 10) {
-                        Button(action: onSave) {
+                        Button(action: saveVideoToPhotos) {
                             Image(systemName: "arrow.down")
                                 .font(.system(size: 24))
                                 .foregroundColor(.white)
@@ -91,6 +95,45 @@ struct VideoPlayerPreviewView: View {
             .safeAreaInset(edge: .leading) { Spacer().frame(width: 8) }
             .safeAreaInset(edge: .trailing) { Spacer().frame(width: 8) }
         }
+        .overlay {
+            if isSavingVideo {
+                ProgressView("Saving video...")
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .shadow(radius: 10)
+            }
+        }
+        .overlay {
+            if showSaveSuccess {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(Color("JellyPrimary"))
+                        Text("Video saved to Photos")
+                            .foregroundColor(.primary)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .shadow(radius: 10)
+                    .padding(.bottom, 100)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.easeInOut, value: showSaveSuccess)
+            }
+        }
+        .alert("Photo Library Access Required", isPresented: $showPhotoLibraryPermissionAlert) {
+            Button("Settings", role: .none) {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please allow access to your photo library to save videos.")
+        }
     }
     
     private func setupLooping() {
@@ -99,5 +142,37 @@ struct VideoPlayerPreviewView: View {
             player.play()
         }
         player.play()
+    }
+    
+    private func saveVideoToPhotos() {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    isSavingVideo = true
+                    PHPhotoLibrary.shared().performChanges({
+                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: mergedVideoURL)
+                    }) { success, error in
+                        DispatchQueue.main.async {
+                            isSavingVideo = false
+                            if success {
+                                showSaveSuccess = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    showSaveSuccess = false
+                                }
+                            } else if let error = error {
+                                print("Error saving video: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                case .denied, .restricted:
+                    showPhotoLibraryPermissionAlert = true
+                case .notDetermined:
+                    break
+                @unknown default:
+                    break
+                }
+            }
+        }
     }
 } 
