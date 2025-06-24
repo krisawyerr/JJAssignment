@@ -19,6 +19,10 @@ struct CreateView: View {
     @StateObject private var playerStore = GenericPlayerManagerStore<RecordedVideo>()
     @Environment(\.scenePhase) private var scenePhase
     @State private var isLongPressing = false
+    @State private var pressStartTime: Date?
+    @State private var isHoldMode = false
+    @State private var holdTimer: Timer?
+    @State private var isProcessingRecordingAction = false
 
     var body: some View {
         VStack {
@@ -100,16 +104,56 @@ struct CreateView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { _ in
-                                if !cameraController.isRecording {
+                                if pressStartTime == nil && !isProcessingRecordingAction {
+                                    pressStartTime = Date()
                                     isLongPressing = true
-                                    cameraController.startRecording(context: context)
+                                    
+                                    holdTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { _ in
+                                        if !cameraController.isRecording && !isProcessingRecordingAction {
+                                            isHoldMode = true
+                                            isProcessingRecordingAction = true
+                                            cameraController.startRecording(context: context)
+                                            
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                isProcessingRecordingAction = false
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             .onEnded { _ in
+                                let pressDuration = pressStartTime?.timeIntervalSinceNow ?? 0
+                                let absoluteDuration = abs(pressDuration)
+                                
+                                holdTimer?.invalidate()
+                                holdTimer = nil
+                                
                                 isLongPressing = false
-                                if cameraController.isRecording {
-                                    isProcessingVideo = true
-                                    cameraController.stopRecording()
+                                pressStartTime = nil
+                                
+                                if isHoldMode {
+                                    if cameraController.isRecording && !isProcessingRecordingAction {
+                                        isProcessingRecordingAction = true
+                                        isProcessingVideo = true
+                                        cameraController.stopRecording()
+                                        
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                            isProcessingRecordingAction = false
+                                        }
+                                    }
+                                    isHoldMode = false
+                                } else if absoluteDuration < 1.0 && !isProcessingRecordingAction {
+                                    isProcessingRecordingAction = true
+                                    if cameraController.isRecording {
+                                        isProcessingVideo = true
+                                        cameraController.stopRecording()
+                                    } else {
+                                        cameraController.startRecording(context: context)
+                                    }
+                                    
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        isProcessingRecordingAction = false
+                                    }
                                 }
                             }
                     )
@@ -121,6 +165,11 @@ struct CreateView: View {
                 } else {
                     progress = 0.0
                     isLongPressing = false
+                    isHoldMode = false
+                    pressStartTime = nil
+                    holdTimer?.invalidate()
+                    holdTimer = nil
+                    isProcessingRecordingAction = false
                 }
             }
             .onChange(of: cameraController.secondsRemaining) { _, secondsRemaining in
@@ -129,6 +178,11 @@ struct CreateView: View {
                     if secondsRemaining <= 0 {
                         isProcessingVideo = true
                         isLongPressing = false
+                        isHoldMode = false
+                        pressStartTime = nil
+                        holdTimer?.invalidate()
+                        holdTimer = nil
+                        isProcessingRecordingAction = false
                     }
                 }
             }

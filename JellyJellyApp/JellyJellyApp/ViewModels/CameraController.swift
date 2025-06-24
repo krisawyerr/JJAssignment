@@ -601,6 +601,9 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         guard !isRecording else { 
             return 
         }
+        
+        cleanupWriter()
+        
         do {
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
             try AVAudioSession.sharedInstance().setActive(true)
@@ -645,10 +648,43 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         }
     }
     
+    private func cleanupWriter() {
+        if let assetWriter = assetWriter, assetWriter.status == .writing {
+            assetWriter.cancelWriting()
+        }
+        
+        videoInput = nil
+        audioInputWriter = nil
+        pixelBufferAdaptor = nil
+        assetWriter = nil
+        isWriterReady = false
+        isAudioReady = false
+        audioSessionStarted = false
+        frameCount = 0
+        startTime = nil
+        
+        frameBufferLock.lock()
+        frontFrameBuffer.removeAll()
+        backFrameBuffer.removeAll()
+        frameBufferLock.unlock()
+        
+        if let outputURL = outputURL {
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+    }
+    
     private func setupWriter() {
         guard let outputURL = outputURL else { return }
+        
+        cleanupWriter()
+        
         let size = CGSize(width: 720, height: 1280)
         assetWriter = try? AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+        
+        guard let assetWriter = assetWriter else {
+            print("Failed to create AVAssetWriter")
+            return
+        }
         
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
@@ -657,8 +693,11 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         ]
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput?.expectsMediaDataInRealTime = true
-        if let videoInput = videoInput, assetWriter?.canAdd(videoInput) == true {
-            assetWriter?.add(videoInput)
+        if let videoInput = videoInput, assetWriter.canAdd(videoInput) {
+            assetWriter.add(videoInput)
+        } else {
+            print("Failed to add video input to asset writer")
+            return
         }
         
         let audioSettings: [String: Any] = [
@@ -669,29 +708,45 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         ]
         let audioInputWriter = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
         audioInputWriter.expectsMediaDataInRealTime = true
-        if assetWriter?.canAdd(audioInputWriter) == true {
-            assetWriter?.add(audioInputWriter)
+        if assetWriter.canAdd(audioInputWriter) {
+            assetWriter.add(audioInputWriter)
             self.audioInputWriter = audioInputWriter
+        } else {
+            print("Failed to add audio input to asset writer")
+            return
         }
         
         pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput!, sourcePixelBufferAttributes: nil)
-        assetWriter?.startWriting()
-        frameCount = 0
-        startTime = nil
-        isWriterReady = true
-        isAudioReady = true
-        audioSessionStarted = false
-        frameBufferLock.lock()
-        frontFrameBuffer.removeAll()
-        backFrameBuffer.removeAll()
-        frameBufferLock.unlock()
+        
+        if assetWriter.status == .unknown {
+            assetWriter.startWriting()
+            frameCount = 0
+            startTime = nil
+            isWriterReady = true
+            isAudioReady = true
+            audioSessionStarted = false
+        } else {
+            print("AssetWriter status is not unknown: \(assetWriter.status.rawValue)")
+            cleanupWriter()
+        }
     }
     
     private func finishWriter() {
+        guard let assetWriter = assetWriter, assetWriter.status == .writing else {
+            print("AssetWriter is not in writing state, cleaning up")
+            cleanupWriter()
+            return
+        }
+        
         videoInput?.markAsFinished()
         audioInputWriter?.markAsFinished()
-        assetWriter?.finishWriting { [weak self] in
-            guard let self = self, let outputURL = self.outputURL else { return }
+        
+        assetWriter.finishWriting { [weak self] in
+            guard let self = self, let outputURL = self.outputURL else { 
+                self?.cleanupWriter()
+                return 
+            }
+            
             DispatchQueue.main.async {
                 let fileManager = FileManager.default
                 if let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
@@ -722,8 +777,11 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
                     }
                     self.onVideoProcessed?()
                 }
+                
+                self.cleanupWriter()
             }
         }
+        
         isWriterReady = false
     }
     
