@@ -94,7 +94,7 @@ class BlurVideoCompositor: NSObject, AVVideoCompositing {
     }
 }
 
-class CameraController: NSObject, ObservableObject {
+class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleBufferDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureMultiCamSession()
     private let frontOutput = AVCaptureMovieFileOutput()
     private let backOutput = AVCaptureMovieFileOutput()
@@ -187,6 +187,8 @@ class CameraController: NSObject, ObservableObject {
     private var audioInputWriter: AVAssetWriterInput?
     private var hasPreWarmedWriter = false
     private let frameBufferLock = NSLock()
+    private var frontVideoDataOutput: AVCaptureVideoDataOutput?
+    private var backVideoDataOutput: AVCaptureVideoDataOutput?
     
     func preWarmWriter() {
         guard !hasPreWarmedWriter else { return }
@@ -339,81 +341,169 @@ class CameraController: NSObject, ObservableObject {
     func setupCamera() {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
+            
+            if self.isSessionSetup && self.session.isRunning { return }
+            
             if self.previewView == nil {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     self.setupCamera()
                 }
                 return
             }
-            if self.isSessionSetup && self.session.isRunning { return }
-            self.resetSession()
+            
+            if self.isSessionSetup {
+                self.resetSession()
+            }
+            
             guard AVCaptureMultiCamSession.isMultiCamSupported else {
                 print("MultiCam not supported")
                 return
             }
-            self.session.beginConfiguration()
-            do {
-                if let front = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
-                    let frontDeviceInput = try AVCaptureDeviceInput(device: front)
-                    self.frontCamera = front
-                    self.frontInput = frontDeviceInput
-                    if self.session.canAddInput(frontDeviceInput) {
-                        self.session.addInput(frontDeviceInput)
-                    } else {
-                        print("Cannot add front camera input")
-                    }
-                    for connection in self.frontOutput.connections {
-                        self.session.removeConnection(connection)
-                    }
-                    if self.session.canAddOutput(self.frontOutput) {
-                        self.session.addOutput(self.frontOutput)
-                    } else {
-                        print("Cannot add front output")
-                    }
-                }
-                if let back = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
-                    let backDeviceInput = try AVCaptureDeviceInput(device: back)
-                    self.backCamera = back
-                    self.backInput = backDeviceInput
-                    if self.session.canAddInput(backDeviceInput) {
-                        self.session.addInput(backDeviceInput)
-                    } else {
-                        print("Cannot add back camera input")
-                    }
-                    for connection in self.backOutput.connections {
-                        self.session.removeConnection(connection)
-                    }
-                    if self.session.canAddOutput(self.backOutput) {
-                        self.session.addOutput(self.backOutput)
-                    } else {
-                        print("Cannot add back output")
-                    }
-                }
-                if let audioDevice = AVCaptureDevice.default(for: .audio) {
-                    let audioInput = try AVCaptureDeviceInput(device: audioDevice)
-                    if self.session.canAddInput(audioInput) {
-                        self.session.addInput(audioInput)
-                    }
-                    let audioDataOutput = AVCaptureAudioDataOutput()
-                    if self.session.canAddOutput(audioDataOutput) {
-                        self.session.addOutput(audioDataOutput)
-                        audioDataOutput.setSampleBufferDelegate(self, queue: self.sessionQueue)
-                        self.audioDataOutput = audioDataOutput
-                    }
-                }
-            } catch {
-                print(error)
-            }
-            self.session.commitConfiguration()
-            self.isSessionSetup = true
+            
+            self.preWarmCameraDevices()
+            
+            self.setupInputsWithNoConnections()
+            
+            self.setupAllOutputs()
+            
             if !self.session.isRunning {
                 self.session.startRunning()
             }
+            
             DispatchQueue.main.async {
                 self.previewView?.setupPreviewLayers(with: self.session)
                 self.isPreviewReady = true
-                self.preWarmWriter()
+                
+                self.frontVideoDataOutput?.setSampleBufferDelegate(self, queue: self.sessionQueue)
+                self.backVideoDataOutput?.setSampleBufferDelegate(self, queue: self.sessionQueue)
+                
+                DispatchQueue.global(qos: .utility).async {
+                    self.preWarmWriter()
+                }
             }
+            
+            self.isSessionSetup = true
+        }
+    }
+    
+    private func preWarmCameraDevices() {
+        if let front = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+            do {
+                try front.lockForConfiguration()
+                front.unlockForConfiguration()
+            } catch {
+                print("Failed to pre-warm front camera: \(error)")
+            }
+        }
+        
+        if let back = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+            do {
+                try back.lockForConfiguration()
+                back.unlockForConfiguration()
+            } catch {
+                print("Failed to pre-warm back camera: \(error)")
+            }
+        }
+    }
+    
+    private func setupInputsWithNoConnections() {
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        
+        do {
+            if let front = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+                let frontDeviceInput = try AVCaptureDeviceInput(device: front)
+                self.frontCamera = front
+                self.frontInput = frontDeviceInput
+                
+                if self.session.canAddInput(frontDeviceInput) {
+                    self.session.addInputWithNoConnections(frontDeviceInput)
+                }
+            }
+            
+            if let back = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+                let backDeviceInput = try AVCaptureDeviceInput(device: back)
+                self.backCamera = back
+                self.backInput = backDeviceInput
+                
+                if self.session.canAddInput(backDeviceInput) {
+                    self.session.addInputWithNoConnections(backDeviceInput)
+                }
+            }
+            
+            if let audioDevice = AVCaptureDevice.default(for: .audio) {
+                let audioInput = try AVCaptureDeviceInput(device: audioDevice)
+                if self.session.canAddInput(audioInput) {
+                    self.session.addInputWithNoConnections(audioInput)
+                }
+            }
+        } catch {
+            print("Camera setup error: \(error)")
+        }
+    }
+    
+    private func setupAllOutputs() {
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        
+        if self.session.canAddOutput(self.frontOutput) {
+            self.session.addOutputWithNoConnections(self.frontOutput)
+        }
+        
+        if self.session.canAddOutput(self.backOutput) {
+            self.session.addOutputWithNoConnections(self.backOutput)
+        }
+        
+        let audioDataOutput = AVCaptureAudioDataOutput()
+        if self.session.canAddOutput(audioDataOutput) {
+            self.session.addOutputWithNoConnections(audioDataOutput)
+            audioDataOutput.setSampleBufferDelegate(self, queue: self.sessionQueue)
+            self.audioDataOutput = audioDataOutput
+            
+            if let audioInput = session.inputs.first(where: { $0 is AVCaptureDeviceInput && ($0 as! AVCaptureDeviceInput).device.hasMediaType(.audio) }) as? AVCaptureDeviceInput {
+                if let audioPort = audioInput.ports(for: .audio, sourceDeviceType: audioInput.device.deviceType, sourceDevicePosition: .unspecified).first {
+                    let audioConnection = AVCaptureConnection(inputPorts: [audioPort], output: audioDataOutput)
+                    if session.canAddConnection(audioConnection) {
+                        session.addConnection(audioConnection)
+                    }
+                }
+            }
+        }
+        
+        if let frontInput = frontInput {
+            let output = AVCaptureVideoDataOutput()
+            output.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+            ]
+            output.alwaysDiscardsLateVideoFrames = true 
+            if session.canAddOutput(output) {
+                session.addOutputWithNoConnections(output)
+                if let port = frontInput.ports(for: .video, sourceDeviceType: frontInput.device.deviceType, sourceDevicePosition: .front).first {
+                    let connection = AVCaptureConnection(inputPorts: [port], output: output)
+                    if session.canAddConnection(connection) {
+                        session.addConnection(connection)
+                    }
+                }
+            }
+            frontVideoDataOutput = output
+        }
+
+        if let backInput = backInput {
+            let output = AVCaptureVideoDataOutput()
+            output.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+            ]
+            output.alwaysDiscardsLateVideoFrames = true 
+            if session.canAddOutput(output) {
+                session.addOutputWithNoConnections(output)
+                if let port = backInput.ports(for: .video, sourceDeviceType: backInput.device.deviceType, sourceDevicePosition: .back).first {
+                    let connection = AVCaptureConnection(inputPorts: [port], output: output)
+                    if session.canAddConnection(connection) {
+                        session.addConnection(connection)
+                    }
+                }
+            }
+            backVideoDataOutput = output
         }
     }
     
@@ -531,6 +621,7 @@ class CameraController: NSObject, ObservableObject {
         let tempDir = FileManager.default.temporaryDirectory
         outputURL = tempDir.appendingPathComponent("merged_realtime_\(timestamp).mp4")
         setupWriter()
+        
         DispatchQueue.main.async {
             self.isRecording = true
         }
@@ -543,6 +634,7 @@ class CameraController: NSObject, ObservableObject {
         }
         stopTimer()
         finishWriter()
+        
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
         } catch {
@@ -677,6 +769,12 @@ class CameraController: NSObject, ObservableObject {
     private func compositeAndWrite(frontBuffer: CMSampleBuffer, backBuffer: CMSampleBuffer, at time: CMTime) {
         guard let assetWriter = assetWriter, let videoInput = videoInput, let pixelBufferAdaptor = pixelBufferAdaptor, videoInput.isReadyForMoreMediaData else { return }
         guard let frontPixelBuffer = CMSampleBufferGetImageBuffer(frontBuffer), let backPixelBuffer = CMSampleBufferGetImageBuffer(backBuffer) else { return }
+        
+        if assetWriter.status == .unknown {
+            assetWriter.startSession(atSourceTime: time)
+            startTime = time
+        }
+        
         let frontImageRaw = CIImage(cvPixelBuffer: frontPixelBuffer)
         let backImageRaw = CIImage(cvPixelBuffer: backPixelBuffer)
         let frontRotate = CGAffineTransform(translationX: 0, y: frontImageRaw.extent.width).rotated(by: -.pi / 2)
@@ -736,10 +834,6 @@ class CameraController: NSObject, ObservableObject {
         CVPixelBufferCreate(kCFAllocatorDefault, Int(size.width), Int(size.height), kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
         if let pixelBuffer = pixelBuffer {
             ciContext.render(outputImage, to: pixelBuffer)
-            if startTime == nil {
-                assetWriter.startSession(atSourceTime: time)
-                startTime = time
-            }
             pixelBufferAdaptor.append(pixelBuffer, withPresentationTime: time)
             frameCount += 1
         }
@@ -857,14 +951,28 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
     }
 }
 
-extension CameraController: AVCaptureAudioDataOutputSampleBufferDelegate {
+extension CameraController {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard isWriterReady, let audioInputWriter = audioInputWriter, audioInputWriter.isReadyForMoreMediaData else { return }
-        if assetWriter?.status == .unknown {
-            if let startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer) as? CMTime {
+        if output === audioDataOutput {
+            guard isWriterReady, let audioInputWriter = audioInputWriter, audioInputWriter.isReadyForMoreMediaData else { return }
+            if assetWriter?.status == .unknown {
+                let startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
                 assetWriter?.startSession(atSourceTime: startTime)
             }
+            audioInputWriter.append(sampleBuffer)
         }
-        audioInputWriter.append(sampleBuffer)
+        else if output === frontVideoDataOutput {
+            if isRecording {
+                processFrontSampleBuffer(sampleBuffer)
+            }
+        } else if output === backVideoDataOutput {
+            if isRecording {
+                processBackSampleBuffer(sampleBuffer)
+            }
+        }
+    }
+    
+    func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+
     }
 }

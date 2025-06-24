@@ -51,6 +51,7 @@ class AppState: ObservableObject {
     }
     
     init() {
+        cameraController.setupCamera()
         Task {
             await loadInitialData()
         }
