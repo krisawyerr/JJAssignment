@@ -141,7 +141,9 @@ struct VideoPlayerPreviewView: View {
             player.seek(to: .zero)
             player.play()
         }
-        player.play()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            player.play()
+        }
     }
     
     private func saveVideoToPhotos() {

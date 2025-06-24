@@ -38,8 +38,8 @@ struct CameraPreviewView: UIViewRepresentable {
 class CameraPreviewUIView: UIView {
     var frontPreviewLayer: AVCaptureVideoPreviewLayer?
     var backPreviewLayer: AVCaptureVideoPreviewLayer?
-    var backgroundSampleBufferLayer: AVSampleBufferDisplayLayer?
-    private var blurEffectView: UIVisualEffectView?
+    // var backgroundSampleBufferLayer: AVSampleBufferDisplayLayer?
+    // private var blurEffectView: UIVisualEffectView?
     private var frontScrollGesture: UIPanGestureRecognizer?
     private var backScrollGesture: UIPanGestureRecognizer?
     private weak var cameraController: CameraController?
@@ -53,46 +53,46 @@ class CameraPreviewUIView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         isUserInteractionEnabled = true
-        setupBackgroundLayer()
+        // setupBackgroundLayer()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         isUserInteractionEnabled = true
-        setupBackgroundLayer()
+        // setupBackgroundLayer()
     }
 
-    private func setupBackgroundLayer() {
-        backgroundSampleBufferLayer = AVSampleBufferDisplayLayer()
-        backgroundSampleBufferLayer?.videoGravity = .resizeAspectFill
-        backgroundSampleBufferLayer?.frame = bounds
+    // private func setupBackgroundLayer() {
+    //     backgroundSampleBufferLayer = AVSampleBufferDisplayLayer()
+    //     backgroundSampleBufferLayer?.videoGravity = .resizeAspectFill
+    //     backgroundSampleBufferLayer?.frame = bounds
         
-        let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
-        let flipTransform = CGAffineTransform(scaleX: -1, y: 1)
-        let combinedTransform = rotationTransform.concatenating(flipTransform)
-        backgroundSampleBufferLayer?.setAffineTransform(combinedTransform)
+    //     let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
+    //     let flipTransform = CGAffineTransform(scaleX: -1, y: 1)
+    //     let combinedTransform = rotationTransform.concatenating(flipTransform)
+    //     backgroundSampleBufferLayer?.setAffineTransform(combinedTransform)
         
-        if let backgroundLayer = backgroundSampleBufferLayer {
-            layer.addSublayer(backgroundLayer)
-        }
+    //     if let backgroundLayer = backgroundSampleBufferLayer {
+    //         layer.addSublayer(backgroundLayer)
+    //     }
         
-        setupBlurEffect()
-    }
+    //     setupBlurEffect()
+    // }
     
-    private func setupBlurEffect() {
-        let blurEffect = UIBlurEffect(style: .light) 
-        blurEffectView = UIVisualEffectView(effect: blurEffect)
-        blurEffectView?.frame = bounds
-        blurEffectView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    // private func setupBlurEffect() {
+    //     let blurEffect = UIBlurEffect(style: .light) 
+    //     blurEffectView = UIVisualEffectView(effect: blurEffect)
+    //     blurEffectView?.frame = bounds
+    //     blurEffectView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         
-        if let blurView = blurEffectView {
-            addSubview(blurView)
-        }
-    }
+    //     if let blurView = blurEffectView {
+    //         addSubview(blurView)
+    //     }
+    // }
 
     func setupPreviewLayers(with session: AVCaptureMultiCamSession) {
         cleanupPreviewLayers()
-        setupBackgroundLayer()
+        // setupBackgroundLayer()
 
         frontPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
         backPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
@@ -214,10 +214,10 @@ class CameraPreviewUIView: UIView {
     }
 
     func cleanupPreviewLayers() {
-        backgroundSampleBufferLayer?.removeFromSuperlayer()
+//        backgroundSampleBufferLayer?.removeFromSuperlayer()
         frontPreviewLayer?.removeFromSuperlayer()
         backPreviewLayer?.removeFromSuperlayer()
-        blurEffectView?.removeFromSuperview()
+//        blurEffectView?.removeFromSuperview()
         
         if let output = frontVideoDataOutput {
             if let session = frontPreviewLayer?.session {
@@ -231,24 +231,24 @@ class CameraPreviewUIView: UIView {
             }
         }
         
-        backgroundSampleBufferLayer = nil
+//        backgroundSampleBufferLayer = nil
         frontPreviewLayer = nil
         backPreviewLayer = nil
         frontVideoDataOutput = nil
         backVideoDataOutput = nil
-        blurEffectView = nil
+//        blurEffectView = nil
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        backgroundSampleBufferLayer?.frame = bounds
+//        backgroundSampleBufferLayer?.frame = bounds
         let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
         let flipTransform = CGAffineTransform(scaleX: -1, y: 1)
         let combinedTransform = rotationTransform.concatenating(flipTransform)
-        backgroundSampleBufferLayer?.setAffineTransform(combinedTransform)
+//        backgroundSampleBufferLayer?.setAffineTransform(combinedTransform)
         
-        blurEffectView?.frame = bounds
+//        blurEffectView?.frame = bounds
         
         if let _ = cameraController,
            let frontLayer = frontPreviewLayer,
@@ -343,11 +343,11 @@ extension CameraPreviewUIView: AVCaptureVideoDataOutputSampleBufferDelegate {
         } else if output === backVideoDataOutput {
             cameraController?.processBackSampleBuffer(sampleBuffer)
         }
-        if #available(iOS 18.0, *), output === backVideoDataOutput {
-            backgroundSampleBufferLayer?.sampleBufferRenderer.enqueue(sampleBuffer)
-        } else if output === backVideoDataOutput {
-            backgroundSampleBufferLayer?.enqueue(sampleBuffer)
-        }
+//        if #available(iOS 18.0, *), output === backVideoDataOutput {
+//            backgroundSampleBufferLayer?.sampleBufferRenderer.enqueue(sampleBuffer)
+//        } else if output === backVideoDataOutput {
+//            backgroundSampleBufferLayer?.enqueue(sampleBuffer)
+//        }
     }
     
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {

@@ -23,7 +23,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color("JellySecondary")
+                Color.black
                 
                 if let player = playerManager.player {
                     if let recordedVideo = videoItem as? RecordedVideo, recordedVideo.isSideBySide {
