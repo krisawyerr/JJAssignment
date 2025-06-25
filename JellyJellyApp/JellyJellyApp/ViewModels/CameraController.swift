@@ -925,25 +925,25 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     }
     
     func setZoomFactor(_ factor: CGFloat, forCamera position: AVCaptureDevice.Position) {
-        // guard let device = position == .front ? frontCamera : backCamera else { return }
+         guard let device = position == .front ? frontCamera : backCamera else { return }
         
-        // do {
-        //     try device.lockForConfiguration()
-        //     let maxZoom = device.activeFormat.videoMaxZoomFactor
-        //     let clampedFactor = min(max(factor, 1.0), maxZoom)
+         do {
+             try device.lockForConfiguration()
+             let maxZoom = device.activeFormat.videoMaxZoomFactor
+             let clampedFactor = min(max(factor, 1.0), maxZoom)
             
-        //     if position == .front {
-        //         frontZoomFactor = clampedFactor
-        //         device.videoZoomFactor = clampedFactor
-        //     } else {
-        //         backZoomFactor = clampedFactor
-        //         device.videoZoomFactor = clampedFactor
-        //     }
+             if position == .front {
+                 frontZoomFactor = clampedFactor
+                 device.videoZoomFactor = clampedFactor
+             } else {
+                 backZoomFactor = clampedFactor
+                 device.videoZoomFactor = clampedFactor
+             }
             
-        //     device.unlockForConfiguration()
-        // } catch {
-        //     print("Error setting zoom factor: \(error.localizedDescription)")
-        // }
+             device.unlockForConfiguration()
+         } catch {
+             print("Error setting zoom factor: \(error.localizedDescription)")
+         }
     }
     
     func toggleFlash() {
@@ -951,9 +951,9 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         
         if isRecording {
             if isFlashOn {
-                turnFlashOn()
-            } else {
                 turnFlashOff()
+            } else {
+                turnFlashOn()
             }
         }
     }
@@ -1031,7 +1031,22 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     }
     
     func flipCameraInFrontOnlyMode() {
+        if isRecording && isFlashOn {
+            if getCurrentActiveCameraPosition() == .front {
+                turnFlashOn()
+            } else {
+                turnFlashOff()
+            }
+        }
         previewView?.flipCameraInFrontOnlyMode()
+    }
+    
+    func getCurrentActiveCameraPosition() -> AVCaptureDevice.Position {
+        if cameraLayoutMode == .frontOnly {
+            return previewView?.activeCameraInFrontOnlyMode ?? initialCameraPosition
+        } else {
+            return .back 
+        }
     }
 }
 
