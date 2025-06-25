@@ -114,6 +114,14 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     @Published var frontZoomFactor: CGFloat = 1.0
     @Published var backZoomFactor: CGFloat = 1.0
     @Published var isPaused = false
+    @Published var isFlashOn = false
+    
+    private var isTorchActive = false
+    
+    var isFlashAvailable: Bool {
+        guard let backCamera = backCamera else { return false }
+        return backCamera.isTorchModeSupported(.on)
+    }
     
     enum CameraLayoutMode: CaseIterable {
         case topBottom
@@ -127,7 +135,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             case .sideBySide:
                 return "rectangle.split.2x1"
             case .frontOnly:
-                return "camera"
+                return "rectangle"
             }
         }
         
@@ -936,6 +944,52 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         // } catch {
         //     print("Error setting zoom factor: \(error.localizedDescription)")
         // }
+    }
+    
+    func toggleFlash() {
+        isFlashOn.toggle()
+        
+        if isRecording {
+            if isFlashOn {
+                turnFlashOn()
+            } else {
+                turnFlashOff()
+            }
+        }
+    }
+    
+    func turnFlashOn() {
+        guard let backCamera = backCamera else { return }
+        
+        do {
+            try backCamera.lockForConfiguration()
+            
+            if backCamera.isTorchModeSupported(.on) {
+                backCamera.torchMode = .on
+                isTorchActive = true
+            }
+            
+            backCamera.unlockForConfiguration()
+        } catch {
+            print("Error turning flash on: \(error.localizedDescription)")
+        }
+    }
+    
+    func turnFlashOff() {
+        guard let backCamera = backCamera else { return }
+        
+        do {
+            try backCamera.lockForConfiguration()
+            
+            if backCamera.isTorchModeSupported(.off) {
+                backCamera.torchMode = .off
+                isTorchActive = false
+            }
+            
+            backCamera.unlockForConfiguration()
+        } catch {
+            print("Error turning flash off: \(error.localizedDescription)")
+        }
     }
     
     func uploadVideoToFirebase(video: RecordedVideo, context: NSManagedObjectContext) async throws {

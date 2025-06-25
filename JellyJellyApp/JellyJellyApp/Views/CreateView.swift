@@ -35,43 +35,47 @@ struct CreateView: View {
                         HStack {
                             Spacer()
                             
-                            Button(action: {
-                                withAnimation {
-                                    cameraController.cameraLayoutMode = cameraController.cameraLayoutMode.next
+                            VStack(spacing: 10) {
+                                Button(action: {
+                                    withAnimation {
+                                        cameraController.cameraLayoutMode = cameraController.cameraLayoutMode.next
+                                    }
+                                }) {
+                                    Image(systemName: cameraController.cameraLayoutMode.icon)
+                                        .font(.system(size: 30))
+                                        .foregroundColor(.white)
+//                                        .background(Color("JellyPrimary").opacity(0.8))
+//                                        .clipShape(Circle())
                                 }
-                            }) {
-                                Image(systemName: cameraController.cameraLayoutMode.icon)
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Color("JellyPrimary").opacity(0.8))
-                                    .clipShape(Circle())
+                                if cameraController.isFlashAvailable {
+                                    Button(action: {
+                                        cameraController.toggleFlash()
+                                    }) {
+                                        Image(systemName: cameraController.isFlashOn ? "flashlight.off.fill" : "flashlight.slash")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(.white)
+//                                            .background(Color("JellyPrimary").opacity(0.8))
+//                                            .clipShape(Circle())
+                                    }
+                                }
+                                if cameraController.cameraLayoutMode == .frontOnly {
+                                    Button(action: {
+                                        cameraController.flipCameraInFrontOnlyMode()
+                                    }) {
+                                        Image(systemName: "camera.rotate")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(.white)
+//                                            .background(Color("JellyPrimary").opacity(0.6))
+//                                            .clipShape(Circle())
+                                    }
+                                }
                             }
-                            .padding(.trailing, 20)
                             .padding(.top, 25)
+                            .padding(.horizontal, 12)
                         }
                     }
 
                     Spacer()
-                    
-                    if cameraController.cameraLayoutMode == .frontOnly {
-                        HStack {
-                            Spacer()
-                            
-                            Button(action: {
-                                cameraController.flipCameraInFrontOnlyMode()
-                            }) {
-                                Image(systemName: "camera.rotate")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Color.black.opacity(0.6))
-                                    .clipShape(Circle())
-                            }
-                            .padding(.trailing, 20)
-                        }
-                        .padding(.bottom, 20)
-                    }
 
                     Spacer()
                     
@@ -97,8 +101,6 @@ struct CreateView: View {
                                     .frame(width: 100, height: 80)
                             }
                         }
-                        .scaleEffect(cameraController.isRecording || isLongPressing ? 1.1 : 1.0)
-                        .animation(.easeInOut(duration: 0.2), value: cameraController.isRecording || isLongPressing)
                     }
                     .padding(.bottom, 50)
                     .simultaneousGesture(
@@ -162,6 +164,10 @@ struct CreateView: View {
             .onChange(of: cameraController.isRecording) { _, isRecording in
                 if isRecording {
                     progress = 0.0
+                    
+                    if cameraController.isFlashOn {
+                        cameraController.turnFlashOn()
+                    }
                 } else {
                     progress = 0.0
                     isLongPressing = false
@@ -170,6 +176,8 @@ struct CreateView: View {
                     holdTimer?.invalidate()
                     holdTimer = nil
                     isProcessingRecordingAction = false
+                    
+                    cameraController.turnFlashOff()
                 }
             }
             .onChange(of: cameraController.secondsRemaining) { _, secondsRemaining in
@@ -183,6 +191,8 @@ struct CreateView: View {
                         holdTimer?.invalidate()
                         holdTimer = nil
                         isProcessingRecordingAction = false
+                        
+                        cameraController.turnFlashOff()
                     }
                 }
             }
