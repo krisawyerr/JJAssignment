@@ -25,7 +25,9 @@ struct CreateView: View {
     @State private var isProcessingRecordingAction = false
     @State private var lastDragLocation: CGPoint = .zero
     @State private var isZooming = false
-    @State private var zoomStartTime: Date?
+    @State private var initialZoomFactor: CGFloat = 1.0
+    @State private var currentMagnification: CGFloat = 1.0
+    @State private var pinchLocation: CGPoint = .zero
 
     var body: some View {
         mainContentView
@@ -43,6 +45,26 @@ struct CreateView: View {
             ZStack {
                 Color.black
                 CameraPreviewView(controller: cameraController, cameraLayoutMode: cameraController.cameraLayoutMode)
+                    .simultaneousGesture(
+                        SimultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    pinchLocation = value.location
+                                },
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    handlePinchChanged(value)
+                                }
+                                .onEnded { value in
+                                    handlePinchEnded(value)
+                                }
+                        )
+                    )
+                    .onTapGesture(count: 2) {
+                        if cameraController.cameraLayoutMode == .frontOnly {
+                            cameraController.flipCameraInFrontOnlyMode()
+                        }
+                    }
                 
                 VStack {
                     topControlsView
@@ -184,14 +206,10 @@ struct CreateView: View {
         }
     }
     
-    
     private func handleDragChanged(_ value: DragGesture.Value) {
-        let currentLocation = value.location
-        
         if pressStartTime == nil && !isProcessingRecordingAction {
             pressStartTime = Date()
             isLongPressing = true
-            lastDragLocation = currentLocation
             
             holdTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { _ in
                 if !cameraController.isRecording && !isProcessingRecordingAction {
@@ -205,32 +223,40 @@ struct CreateView: View {
                 }
             }
         }
-        
-        if cameraController.isRecording && isHoldMode {
-            handleZooming(currentLocation)
-        }
     }
     
-    private func handleZooming(_ currentLocation: CGPoint) {
-        let deltaY = currentLocation.y - lastDragLocation.y
-        let zoomDelta = -deltaY / 100.0
-        
-        let targetCamera: AVCaptureDevice.Position
-        if cameraController.cameraLayoutMode == .frontOnly {
-            targetCamera = cameraController.getCurrentActiveCameraPosition()
-        } else if cameraController.cameraLayoutMode == .topBottom {
-            targetCamera = currentLocation.y < UIScreen.main.bounds.height / 2 ? .front : .back
-        } else { 
-            targetCamera = currentLocation.x < UIScreen.main.bounds.width / 2 ? .front : .back
+    private func handlePinchChanged(_ magnification: CGFloat) {
+        if !isZooming {
+            isZooming = true
+            let targetCamera = getTargetCameraForPinch()
+            initialZoomFactor = targetCamera == .front ? cameraController.frontZoomFactor : cameraController.backZoomFactor
         }
         
-        print("Zoom - Location: \(currentLocation), Layout: \(cameraController.cameraLayoutMode), Target: \(targetCamera == .front ? "front" : "back")")
+        currentMagnification = magnification
+        let newZoomFactor = initialZoomFactor * magnification
         
-        let currentZoom = targetCamera == .front ? cameraController.frontZoomFactor : cameraController.backZoomFactor
-        let newZoom = currentZoom + zoomDelta
-        cameraController.setZoomFactor(newZoom, forCamera: targetCamera)
+        let targetCamera = getTargetCameraForPinch()
+        cameraController.setZoomFactor(newZoomFactor, forCamera: targetCamera)
+    }
+    
+    private func handlePinchEnded(_ magnification: CGFloat) {
+        isZooming = false
+        currentMagnification = 1.0
         
-        lastDragLocation = currentLocation
+        let targetCamera = getTargetCameraForPinch()
+        initialZoomFactor = targetCamera == .front ? cameraController.frontZoomFactor : cameraController.backZoomFactor
+    }
+    
+    private func getTargetCameraForPinch() -> AVCaptureDevice.Position {
+        if cameraController.cameraLayoutMode == .frontOnly {
+            return cameraController.getCurrentActiveCameraPosition()
+        } else if cameraController.cameraLayoutMode == .topBottom {
+            let screenHeight = UIScreen.main.bounds.height
+            return pinchLocation.y < screenHeight / 2 ? .front : .back
+        } else { 
+            let screenWidth = UIScreen.main.bounds.width
+            return pinchLocation.x < screenWidth / 2 ? .front : .back
+        }
     }
     
     private func handleDragEnded(_ value: DragGesture.Value) {
@@ -242,8 +268,6 @@ struct CreateView: View {
         
         isLongPressing = false
         pressStartTime = nil
-        isZooming = false
-        zoomStartTime = nil
         
         if isHoldMode {
             if cameraController.isRecording && !isProcessingRecordingAction {

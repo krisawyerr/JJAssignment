@@ -10,6 +10,8 @@ import AVFoundation
 import CoreData
 import FirebaseStorage
 import CoreImage
+import Foundation
+import UIKit
 
 class BlurVideoCompositor: NSObject, AVVideoCompositing {
     nonisolated var sourcePixelBufferAttributes: [String : Any]? {
@@ -769,6 +771,8 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
                             newRecording.isSideBySide = (self.cameraLayoutMode == .sideBySide)
                             newRecording.isFrontOnly = (self.cameraLayoutMode == .frontOnly)
                             try? context.save()
+                            
+                            self.createWatermarkedVersion(originalURL: destURL, context: context, video: newRecording)
                         }
                         self.mergedVideoURL = destURL
                     } catch {
@@ -780,6 +784,8 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
                             newRecording.isSideBySide = (self.cameraLayoutMode == .sideBySide)
                             newRecording.isFrontOnly = (self.cameraLayoutMode == .frontOnly)
                             try? context.save()
+                            
+                            self.createWatermarkedVersion(originalURL: outputURL, context: context, video: newRecording)
                         }
                         self.mergedVideoURL = outputURL
                     }
@@ -791,6 +797,26 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         }
         
         isWriterReady = false
+    }
+    
+    private func createWatermarkedVersion(originalURL: URL, context: NSManagedObjectContext, video: RecordedVideo) {
+        let watermarkedFileName = "watermarked_\(originalURL.lastPathComponent)"
+        let watermarkedURL = originalURL.deletingLastPathComponent().appendingPathComponent(watermarkedFileName)
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            VideoWatermarkService.shared.addWatermarkToVideo(inputURL: originalURL, outputURL: watermarkedURL) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let watermarkedURL):
+                        video.watermarkedVideoURL = watermarkedURL.absoluteString
+                        try? context.save()
+                        print("Watermarked video created successfully: \(watermarkedURL)")
+                    case .failure(let error):
+                        print("Failed to create watermarked video: \(error)")
+                    }
+                }
+            }
+        }
     }
     
     func processFrontSampleBuffer(_ sampleBuffer: CMSampleBuffer) {

@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Photos
+import CoreData
 
 struct VideoPlayerPreviewView: View {
     let mergedVideoURL: URL
@@ -12,6 +13,9 @@ struct VideoPlayerPreviewView: View {
     @State private var isSavingVideo = false
     @State private var showSaveSuccess = false
     @State private var showPhotoLibraryPermissionAlert = false
+    @State private var watermarkedVideoURL: URL?
+    @State private var isWatermarkingInProgress = false
+    @Environment(\.managedObjectContext) private var context
     
     init(mergedVideoURL: URL, onSave: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.mergedVideoURL = mergedVideoURL
@@ -30,6 +34,7 @@ struct VideoPlayerPreviewView: View {
                         .cornerRadius(16)
                         .onAppear {
                             setupLooping()
+                            loadWatermarkedVideoURL()
                         }
                         .onDisappear {
                             player.pause()
@@ -146,21 +151,77 @@ struct VideoPlayerPreviewView: View {
         }
     }
     
+    private func loadWatermarkedVideoURL() {
+        let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedVideoURL.absoluteString)
+        
+        if let video = try? context.fetch(fetchRequest).first {
+            if let watermarkedURLString = video.watermarkedVideoURL,
+               let watermarkedURL = URL(string: watermarkedURLString) {
+                self.watermarkedVideoURL = watermarkedURL
+                self.isWatermarkingInProgress = false
+            } else {
+                self.isWatermarkingInProgress = true
+                
+                Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+                    let updatedFetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+                    updatedFetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedVideoURL.absoluteString)
+                    
+                    if let updatedVideo = try? context.fetch(updatedFetchRequest).first,
+                       let watermarkedURLString = updatedVideo.watermarkedVideoURL,
+                       let watermarkedURL = URL(string: watermarkedURLString) {
+                        self.watermarkedVideoURL = watermarkedURL
+                        self.isWatermarkingInProgress = false
+                        timer.invalidate()
+                    }
+                }
+            }
+        }
+    }
+    
     private func saveVideoToPhotos() {
+        isSavingVideo = true
+        
+        if let watermarkedURL = watermarkedVideoURL,
+           FileManager.default.fileExists(atPath: watermarkedURL.path) {
+            proceedWithSaving(watermarkedURL: watermarkedURL)
+        } else {
+            waitForWatermarkedVideo()
+        }
+    }
+    
+    private func waitForWatermarkedVideo() {
+        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedVideoURL.absoluteString)
+            
+            if let video = try? context.fetch(fetchRequest).first,
+               let watermarkedURLString = video.watermarkedVideoURL,
+               let watermarkedURL = URL(string: watermarkedURLString),
+               FileManager.default.fileExists(atPath: watermarkedURL.path) {
+                
+                timer.invalidate()
+                self.watermarkedVideoURL = watermarkedURL
+                self.isWatermarkingInProgress = false
+                self.proceedWithSaving(watermarkedURL: watermarkedURL)
+            }
+        }
+    }
+    
+    private func proceedWithSaving(watermarkedURL: URL) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             DispatchQueue.main.async {
                 switch status {
                 case .authorized, .limited:
-                    isSavingVideo = true
                     PHPhotoLibrary.shared().performChanges({
-                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: mergedVideoURL)
+                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: watermarkedURL)
                     }) { success, error in
                         DispatchQueue.main.async {
-                            isSavingVideo = false
+                            self.isSavingVideo = false
                             if success {
-                                showSaveSuccess = true
+                                self.showSaveSuccess = true
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                    showSaveSuccess = false
+                                    self.showSaveSuccess = false
                                 }
                             } else if let error = error {
                                 print("Error saving video: \(error.localizedDescription)")
@@ -168,10 +229,13 @@ struct VideoPlayerPreviewView: View {
                         }
                     }
                 case .denied, .restricted:
-                    showPhotoLibraryPermissionAlert = true
+                    self.isSavingVideo = false
+                    self.showPhotoLibraryPermissionAlert = true
                 case .notDetermined:
+                    self.isSavingVideo = false
                     break
                 @unknown default:
+                    self.isSavingVideo = false
                     break
                 }
             }

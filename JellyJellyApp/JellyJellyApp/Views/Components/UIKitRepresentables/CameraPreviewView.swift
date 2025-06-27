@@ -38,10 +38,7 @@ struct CameraPreviewView: UIViewRepresentable {
 class CameraPreviewUIView: UIView {
     var frontPreviewLayer: AVCaptureVideoPreviewLayer?
     var backPreviewLayer: AVCaptureVideoPreviewLayer?
-    // var backgroundSampleBufferLayer: AVSampleBufferDisplayLayer?
-    // private var blurEffectView: UIVisualEffectView?
-    private var frontScrollGesture: UIPanGestureRecognizer?
-    private var backScrollGesture: UIPanGestureRecognizer?
+
     private weak var cameraController: CameraController?
     var cameraLayoutMode: CameraController.CameraLayoutMode = .topBottom
     var activeCameraInFrontOnlyMode: AVCaptureDevice.Position = .front
@@ -49,42 +46,13 @@ class CameraPreviewUIView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         isUserInteractionEnabled = true
-        // setupBackgroundLayer()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         isUserInteractionEnabled = true
-        // setupBackgroundLayer()
     }
 
-    // private func setupBackgroundLayer() {
-    //     backgroundSampleBufferLayer = AVSampleBufferDisplayLayer()
-    //     backgroundSampleBufferLayer?.videoGravity = .resizeAspectFill
-    //     backgroundSampleBufferLayer?.frame = bounds
-        
-    //     let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
-    //     let flipTransform = CGAffineTransform(scaleX: -1, y: 1)
-    //     let combinedTransform = rotationTransform.concatenating(flipTransform)
-    //     backgroundSampleBufferLayer?.setAffineTransform(combinedTransform)
-        
-    //     if let backgroundLayer = backgroundSampleBufferLayer {
-    //         layer.addSublayer(backgroundLayer)
-    //     }
-        
-    //     setupBlurEffect()
-    // }
-    
-    // private func setupBlurEffect() {
-    //     let blurEffect = UIBlurEffect(style: .light) 
-    //     blurEffectView = UIVisualEffectView(effect: blurEffect)
-    //     blurEffectView?.frame = bounds
-    //     blurEffectView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        
-    //     if let blurView = blurEffectView {
-    //         addSubview(blurView)
-    //     }
-    // }
 
     func setupPreviewLayers(with session: AVCaptureMultiCamSession) {
         cleanupPreviewLayers()
@@ -130,18 +98,12 @@ class CameraPreviewUIView: UIView {
     }
 
     private func setupPinchGesture(for position: AVCaptureDevice.Position) {
-        let scrollGesture = UIPanGestureRecognizer(target: self, action: #selector(handleScroll(_:)))
-        scrollGesture.delegate = self
-        addGestureRecognizer(scrollGesture)
-        
-        if position == .front {
-            frontScrollGesture = scrollGesture
-        } else {
-            backScrollGesture = scrollGesture
-        }
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinchGesture.delegate = self
+        addGestureRecognizer(pinchGesture)
     }
 
-    @objc private func handleScroll(_ gesture: UIPanGestureRecognizer) {
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
         guard let cameraController = cameraController else { return }
         
         let location = gesture.location(in: self)
@@ -155,18 +117,12 @@ class CameraPreviewUIView: UIView {
             position = location.x < bounds.width / 2 ? .front : .back
         }
         
-        let translation = gesture.translation(in: self)
-        let zoomDelta = -translation.y / 100.0 
+        let scale = gesture.scale
+        let currentZoom = position == .front ? cameraController.frontZoomFactor : cameraController.backZoomFactor
+        let newZoom = currentZoom * scale
         
-        switch gesture.state {
-        case .changed:
-            let currentZoom = position == .front ? cameraController.frontZoomFactor : cameraController.backZoomFactor
-            let newZoom = currentZoom + zoomDelta
-            cameraController.setZoomFactor(newZoom, forCamera: position)
-            gesture.setTranslation(.zero, in: self)
-        default:
-            break
-        }
+        cameraController.setZoomFactor(newZoom, forCamera: position)
+        gesture.scale = 1.0
     }
 
     func setCameraController(_ controller: CameraController) {

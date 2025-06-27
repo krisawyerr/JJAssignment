@@ -16,6 +16,8 @@
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="frontVideoURL" optional="YES" attributeType="String"/>
         <attribute name="mergedVideoURL" optional="YES" attributeType="String"/>
+        <attribute name="mergedVideoURLNoWatermark" optional="YES" attributeType="String"/>
+        <attribute name="watermarkedVideoURL" optional="YES" attributeType="String"/>
         <attribute name="saved" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="firebaseStorageURL" optional="YES" attributeType="String"/>
         <attribute name="isSideBySide" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
