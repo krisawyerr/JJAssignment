@@ -141,7 +141,7 @@ class CameraPreviewUIView: UIView {
 
         let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
         let flipTransform = CGAffineTransform(scaleX: -1, y: 1)
-        let combinedTransform = rotationTransform.concatenating(flipTransform)
+        let _ = rotationTransform.concatenating(flipTransform)
         
         if let _ = cameraController,
            let frontLayer = frontPreviewLayer,

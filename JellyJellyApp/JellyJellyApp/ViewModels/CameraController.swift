@@ -13,89 +13,6 @@ import CoreImage
 import Foundation
 import UIKit
 
-class BlurVideoCompositor: NSObject, AVVideoCompositing {
-    nonisolated var sourcePixelBufferAttributes: [String : Any]? {
-        return [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-    }
-    
-    nonisolated var requiredPixelBufferAttributesForRenderContext: [String : Any] {
-        return [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-    }
-    
-    private var context: CIContext?
-    private var blurFilter: CIFilter?
-    
-    override init() {
-        super.init()
-        context = CIContext()
-        blurFilter = CIFilter(name: "CIGaussianBlur")
-        blurFilter?.setValue(5.0, forKey: kCIInputRadiusKey)
-    }
-    
-    func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
-        context = CIContext()
-    }
-    
-    func startRequest(_ asyncVideoCompositionRequest: AVAsynchronousVideoCompositionRequest) {
-        guard let sourcePixelBuffer = asyncVideoCompositionRequest.sourceFrame(byTrackID: kCMPersistentTrackID_Invalid) else {
-            if let blackPixelBuffer = createBlackPixelBuffer(size: asyncVideoCompositionRequest.renderContext.size) {
-                asyncVideoCompositionRequest.finish(withComposedVideoFrame: blackPixelBuffer)
-            } else {
-                if let originalPixelBuffer = asyncVideoCompositionRequest.sourceFrame(byTrackID: kCMPersistentTrackID_Invalid) {
-                    asyncVideoCompositionRequest.finish(withComposedVideoFrame: originalPixelBuffer)
-                }
-            }
-            return
-        }
-        
-        let ciImage = CIImage(cvPixelBuffer: sourcePixelBuffer)
-        blurFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-        
-        guard let outputImage = blurFilter?.outputImage,
-              let context = context,
-              let outputPixelBuffer = asyncVideoCompositionRequest.renderContext.newPixelBuffer() else {
-            asyncVideoCompositionRequest.finish(withComposedVideoFrame: sourcePixelBuffer)
-            return
-        }
-        
-        context.render(outputImage, to: outputPixelBuffer)
-        asyncVideoCompositionRequest.finish(withComposedVideoFrame: outputPixelBuffer)
-    }
-    
-    private func createBlackPixelBuffer(size: CGSize) -> CVPixelBuffer? {
-        var pixelBuffer: CVPixelBuffer?
-        let attrs = [kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
-                    kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue] as CFDictionary
-        
-        let status = CVPixelBufferCreate(kCFAllocatorDefault,
-                                       Int(size.width),
-                                       Int(size.height),
-                                       kCVPixelFormatType_32BGRA,
-                                       attrs,
-                                       &pixelBuffer)
-        
-        guard status == kCVReturnSuccess, let pixelBuffer = pixelBuffer else {
-            return nil
-        }
-        
-        CVPixelBufferLockBaseAddress(pixelBuffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
-        
-        let context = CGContext(data: CVPixelBufferGetBaseAddress(pixelBuffer),
-                              width: Int(size.width),
-                              height: Int(size.height),
-                              bitsPerComponent: 8,
-                              bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-                              space: CGColorSpaceCreateDeviceRGB(),
-                              bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
-        
-        context?.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
-        context?.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height))
-        
-        return pixelBuffer
-    }
-}
-
 class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleBufferDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureMultiCamSession()
     private let frontOutput = AVCaptureMovieFileOutput()
@@ -702,13 +619,10 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         if session.isRunning {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
-                do {
-                    self.session.beginConfiguration()
-                    self.session.commitConfiguration()
-                    self.session.stopRunning()
-                } catch {
-                    print("Error stopping camera session: \(error.localizedDescription)")
-                }
+
+                self.session.beginConfiguration()
+                self.session.commitConfiguration()
+                self.session.stopRunning()
             }
         }
     }
@@ -1213,7 +1127,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             }
         }
         
-        let previousCamera = activeCameraInFrontOnlyMode
+        let _ = activeCameraInFrontOnlyMode
         activeCameraInFrontOnlyMode = activeCameraInFrontOnlyMode == .front ? .back : .front
         
         if isRecording {
@@ -1312,7 +1226,7 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
                     self.backPreviewURL = backURL
                 }
                 
-                if let context = self.storedContext {
+                if self.storedContext != nil {
                     self.processingStartTime = CFAbsoluteTimeGetCurrent()
                     print("Starting video processing at: \(self.processingStartTime)")
                 } else {

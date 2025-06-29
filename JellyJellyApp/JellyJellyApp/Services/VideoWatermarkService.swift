@@ -9,26 +9,44 @@ class VideoWatermarkService {
     private init() {}
     
     func addWatermarkToVideo(inputURL: URL, outputURL: URL, completion: @escaping (Result<URL, Error>) -> Void) {
-        let asset = AVAsset(url: inputURL)
+        Task {
+            do {
+                let result = try await addWatermarkToVideoAsync(inputURL: inputURL, outputURL: outputURL)
+                DispatchQueue.main.async {
+                    completion(.success(result))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    func addWatermarkToVideoAsync(inputURL: URL, outputURL: URL) async throws -> URL {
+        let asset = AVURLAsset(url: inputURL)
         
         let composition = AVMutableComposition()
         let videoComposition = AVMutableVideoComposition()
         
-        guard let videoTrack = asset.tracks(withMediaType: .video).first,
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        guard let videoTrack = videoTracks.first,
               let compositionVideoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            completion(.failure(NSError(domain: "VideoWatermarkError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create video track"])))
-            return
+            throw NSError(domain: "VideoWatermarkError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create video track"])
         }
         
-        let timeRange = CMTimeRange(start: .zero, duration: asset.duration)
-        try? compositionVideoTrack.insertTimeRange(timeRange, of: videoTrack, at: .zero)
+        let duration = try await asset.load(.duration)
+        let timeRange = CMTimeRange(start: .zero, duration: duration)
+        try compositionVideoTrack.insertTimeRange(timeRange, of: videoTrack, at: .zero)
         
-        if let audioTrack = asset.tracks(withMediaType: .audio).first,
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        if let audioTrack = audioTracks.first,
            let compositionAudioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            try? compositionAudioTrack.insertTimeRange(timeRange, of: audioTrack, at: .zero)
+            try compositionAudioTrack.insertTimeRange(timeRange, of: audioTrack, at: .zero)
         }
         
-        videoComposition.renderSize = videoTrack.naturalSize
+        let naturalSize = try await videoTrack.load(.naturalSize)
+        videoComposition.renderSize = naturalSize
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         
         let instruction = AVMutableVideoCompositionInstruction()
@@ -39,11 +57,10 @@ class VideoWatermarkService {
         
         videoComposition.instructions = [instruction]
         
-        videoComposition.animationTool = createWatermarkAnimationTool(videoSize: videoTrack.naturalSize)
+        videoComposition.animationTool = createWatermarkAnimationTool(videoSize: naturalSize)
         
         guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
-            completion(.failure(NSError(domain: "VideoWatermarkError", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to create export session"])))
-            return
+            throw NSError(domain: "VideoWatermarkError", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to create export session"])
         }
         
         exportSession.outputURL = outputURL
@@ -52,20 +69,9 @@ class VideoWatermarkService {
         
         try? FileManager.default.removeItem(at: outputURL)
         
-        exportSession.exportAsynchronously {
-            DispatchQueue.main.async {
-                switch exportSession.status {
-                case .completed:
-                    completion(.success(outputURL))
-                case .failed:
-                    completion(.failure(exportSession.error ?? NSError(domain: "VideoWatermarkError", code: -3, userInfo: [NSLocalizedDescriptionKey: "Export failed"])))
-                case .cancelled:
-                    completion(.failure(NSError(domain: "VideoWatermarkError", code: -4, userInfo: [NSLocalizedDescriptionKey: "Export cancelled"])))
-                default:
-                    completion(.failure(NSError(domain: "VideoWatermarkError", code: -5, userInfo: [NSLocalizedDescriptionKey: "Unknown export error"])))
-                }
-            }
-        }
+        try await exportSession.export(to: outputURL, as: .mp4)
+        
+        return outputURL
     }
     
     private func createWatermarkAnimationTool(videoSize: CGSize) -> AVVideoCompositionCoreAnimationTool {
