@@ -103,6 +103,9 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     private let storage = Storage.storage()
     private let sessionQueue = DispatchQueue(label: "CameraSessionQueue")
     
+    private let frontAudioOutput = AVCaptureAudioDataOutput()
+    private let audioOutQueue = DispatchQueue(label: "com.jellyjelly.CameraController.audioDataOutputQueue")
+    
     private weak var previewView: CameraPreviewUIView?
     private var frontURL: URL?
     private var backURL: URL?
@@ -227,7 +230,6 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     private var isAudioReady = false
     private var audioSessionStarted = false
     private let writerSessionLock = NSLock()
-    private var audioDataOutput: AVCaptureAudioDataOutput?
     private var audioInputWriter: AVAssetWriterInput?
     private var hasPreWarmedWriter = false
     private let frameBufferLock = NSLock()
@@ -236,6 +238,38 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     
     private var backCameraType: AVCaptureDevice.DeviceType?
     
+    @Published var frontAudioLevel: CGFloat = 0.0
+    private var audioLevelTimer: Timer?
+    
+    
+    private func configureAudioSessionForFrontCameraRecording() throws {
+        let session = AVAudioSession.sharedInstance()
+        
+        try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.allowBluetooth, .defaultToSpeaker])
+        try session.setActive(true, options: [.notifyOthersOnDeactivation])
+        
+        guard let micInput = session.availableInputs?.first(where: {
+            $0.portType == AVAudioSession.Port.builtInMic
+        }) else {
+            return
+        }
+        
+        if let bottomSource = micInput.dataSources?.first(where: {
+            $0.orientation == AVAudioSession.Orientation.bottom
+        }) {
+            try micInput.setPreferredDataSource(bottomSource)
+        } else {
+            print("Bottom mic data source not found, using default")
+        }
+        
+        try session.setPreferredInput(micInput)
+    }
+    
+    private func deactivateAudioSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setActive(false, options: [.notifyOthersOnDeactivation])
+    }
+    
     private func getBestFrontCamera() -> AVCaptureDevice? {
         return AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
     }
@@ -243,14 +277,14 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     private func getBestBackCamera() -> AVCaptureDevice? {
         if let ultraWideCamera = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) {
             backCameraType = .builtInUltraWideCamera
-            backInitialZoom = currentBackZoom.zoomFactor 
+            backInitialZoom = currentBackZoom.zoomFactor
             print("Using ultra-wide camera with initial zoom: \(currentBackZoom.displayText)")
             return ultraWideCamera
         }
         
         if let wideCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
             backCameraType = .builtInWideAngleCamera
-            backInitialZoom = currentBackZoom.zoomFactor 
+            backInitialZoom = currentBackZoom.zoomFactor
             print("Using wide-angle camera with initial zoom: \(currentBackZoom.displayText)")
             return wideCamera
         }
@@ -377,9 +411,9 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         }
         
         do {
-            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            try deactivateAudioSession()
         } catch {
-            print("Failed to deactivate AVAudioSession: \(error)")
+            print("Failed to deactivate audio session: \(error)")
         }
     }
     
@@ -538,28 +572,38 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             self.session.addOutputWithNoConnections(self.backOutput)
         }
         
-        let audioDataOutput = AVCaptureAudioDataOutput()
-        if self.session.canAddOutput(audioDataOutput) {
-            self.session.addOutputWithNoConnections(audioDataOutput)
-            audioDataOutput.setSampleBufferDelegate(self, queue: self.sessionQueue)
-            self.audioDataOutput = audioDataOutput
-            
+        configureAudioOutputs()
+        
+        configureVideoDataOutputs()
+    }
+    
+    private func configureAudioOutputs() {
+        if self.session.canAddOutput(self.frontAudioOutput) {
+            self.session.addOutputWithNoConnections(self.frontAudioOutput)
+            self.frontAudioOutput.setSampleBufferDelegate(self, queue: self.audioOutQueue)
+        } else {
+            print("Failed to add front audio output")
+        }
+        
             if let audioInput = session.inputs.first(where: { $0 is AVCaptureDeviceInput && ($0 as! AVCaptureDeviceInput).device.hasMediaType(.audio) }) as? AVCaptureDeviceInput {
                 if let audioPort = audioInput.ports(for: .audio, sourceDeviceType: audioInput.device.deviceType, sourceDevicePosition: .unspecified).first {
-                    let audioConnection = AVCaptureConnection(inputPorts: [audioPort], output: audioDataOutput)
-                    if session.canAddConnection(audioConnection) {
-                        session.addConnection(audioConnection)
-                    }
+                let frontAudioConnection = AVCaptureConnection(inputPorts: [audioPort], output: self.frontAudioOutput)
+                if session.canAddConnection(frontAudioConnection) {
+                    session.addConnection(frontAudioConnection)
+                } else {
+                    print("Failed to add front audio connection")
                 }
             }
         }
-        
+    }
+    
+    private func configureVideoDataOutputs() {
         if let frontInput = frontInput {
             let output = AVCaptureVideoDataOutput()
             output.videoSettings = [
                 kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
             ]
-            output.alwaysDiscardsLateVideoFrames = true 
+            output.alwaysDiscardsLateVideoFrames = true
             if session.canAddOutput(output) {
                 session.addOutputWithNoConnections(output)
                 if let port = frontInput.ports(for: .video, sourceDeviceType: frontInput.device.deviceType, sourceDevicePosition: .front).first {
@@ -570,6 +614,15 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
                 }
             }
             frontVideoDataOutput = output
+            
+            if let videoPort = frontInput.ports(for: .video, sourceDeviceType: frontInput.device.deviceType, sourceDevicePosition: .front).first {
+                let frontVideoConnection = AVCaptureConnection(inputPorts: [videoPort], output: self.frontOutput)
+                if session.canAddConnection(frontVideoConnection) {
+                    session.addConnection(frontVideoConnection)
+                } else {
+                    print("Failed to add front video connection to movie output")
+                }
+            }
         }
 
         if let backInput = backInput {
@@ -577,7 +630,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             output.videoSettings = [
                 kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
             ]
-            output.alwaysDiscardsLateVideoFrames = true 
+            output.alwaysDiscardsLateVideoFrames = true
             if session.canAddOutput(output) {
                 session.addOutputWithNoConnections(output)
                 if let port = backInput.ports(for: .video, sourceDeviceType: backInput.device.deviceType, sourceDevicePosition: .back).first {
@@ -588,6 +641,15 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
                 }
             }
             backVideoDataOutput = output
+            
+            if let videoPort = backInput.ports(for: .video, sourceDeviceType: backInput.device.deviceType, sourceDevicePosition: .back).first {
+                let backVideoConnection = AVCaptureConnection(inputPorts: [videoPort], output: self.backOutput)
+                if session.canAddConnection(backVideoConnection) {
+                    session.addConnection(backVideoConnection)
+                } else {
+                    print("Failed to add back video connection to movie output")
+                }
+            }
         }
     }
     
@@ -682,18 +744,19 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     }
     
     func startRecording(context: NSManagedObjectContext) {
-        guard !isRecording else { 
-            return 
+        guard !isRecording else {
+            return
         }
         
         cleanupWriter()
         
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
-            try AVAudioSession.sharedInstance().setActive(true)
+            try configureAudioSessionForFrontCameraRecording()
+            logCurrentAudioSessionSettings()
         } catch {
-            print("Failed to set AVAudioSession: \(error)")
+            print("Failed to configure audio session for front camera recording: \(error)")
         }
+        
         storedContext = context
         recordingCompletionCount = 0
         secondsRemaining = maxRecordingTime
@@ -702,7 +765,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         if cameraLayoutMode == .frontOnly {
             initialCameraPosition = activeCameraInFrontOnlyMode
         } else {
-            initialCameraPosition = .front 
+            initialCameraPosition = .front
         }
         let timestamp = Date().timeIntervalSince1970
         let tempDir = FileManager.default.temporaryDirectory
@@ -713,20 +776,22 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             self.isRecording = true
         }
         startTimer()
+        startAudioLevelMonitoring()
     }
     
     func stopRecording() {
-        guard isRecording else { 
-            return 
+        guard isRecording else {
+            return
         }
         stopTimer()
         finishWriter()
         
         do {
-            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            try deactivateAudioSession()
         } catch {
-            print("Failed to deactivate AVAudioSession: \(error)")
+            print("Failed to deactivate audio session: \(error)")
         }
+        stopAudioLevelMonitoring()
         DispatchQueue.main.async {
             self.isRecording = false
         }
@@ -786,9 +851,10 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         
         let audioSettings: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVNumberOfChannelsKey: 1,
-            AVSampleRateKey: 44100,
-            AVEncoderBitRateKey: 64000
+            AVNumberOfChannelsKey: 2,
+            AVSampleRateKey: 48000,
+            AVEncoderBitRateKey: 128000,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
         let audioInputWriter = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
         audioInputWriter.expectsMediaDataInRealTime = true
@@ -826,9 +892,9 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         audioInputWriter?.markAsFinished()
         
         assetWriter.finishWriting { [weak self] in
-            guard let self = self, let outputURL = self.outputURL else { 
+            guard let self = self, let outputURL = self.outputURL else {
                 self?.cleanupWriter()
-                return 
+                return
             }
             
             DispatchQueue.main.async {
@@ -1161,7 +1227,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         if cameraLayoutMode == .frontOnly {
             return activeCameraInFrontOnlyMode
         } else {
-            return .back 
+            return .back
         }
     }
     
@@ -1237,7 +1303,7 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
 
         if let error = error {
             print("Recording error: \(error.localizedDescription)")
-        } 
+        }
 
         if recordingCompletionCount >= 2 {
             DispatchQueue.main.async {
@@ -1259,15 +1325,15 @@ extension CameraController: AVCaptureFileOutputRecordingDelegate {
 
 extension CameraController {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        if output === audioDataOutput {
-            guard isWriterReady, let audioInputWriter = audioInputWriter, audioInputWriter.isReadyForMoreMediaData else { return }
-            if assetWriter?.status == .unknown {
-                let startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                assetWriter?.startSession(atSourceTime: startTime)
+        if output === frontAudioOutput {
+            if isRecording, let audioInputWriter = audioInputWriter, audioInputWriter.isReadyForMoreMediaData {
+                if assetWriter?.status == .unknown {
+                    let startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                    assetWriter?.startSession(atSourceTime: startTime)
+                }
+                audioInputWriter.append(sampleBuffer)
             }
-            audioInputWriter.append(sampleBuffer)
-        }
-        else if output === frontVideoDataOutput {
+        } else if output === frontVideoDataOutput {
             if isRecording {
                 processFrontSampleBuffer(sampleBuffer)
             }
