@@ -155,6 +155,40 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     
     @Published var cameraLayoutMode: CameraLayoutMode = .topBottom
     
+    enum BackCameraZoom: CaseIterable {
+        case oneX
+        case twoX
+        // case threeX
+        
+        var zoomFactor: CGFloat {
+            switch self {
+            case .oneX: return 1.0
+            case .twoX: return 2.0
+            // case .threeX: return 4.0
+            }
+        }
+        
+        var displayText: String {
+            switch self {
+            case .oneX: return "0.5x"
+            case .twoX: return "1x"
+            // case .threeX: return "2x"
+            }
+        }
+        
+        var next: BackCameraZoom {
+            switch self {
+            case .oneX: return .twoX
+            case .twoX: return .oneX
+            // case .threeX: return .oneX
+            }
+        }
+    }
+    
+    @Published var currentBackZoom: BackCameraZoom = .twoX
+    @Published var activeCameraInFrontOnlyMode: AVCaptureDevice.Position = .front
+    @Published var exactBackZoomFactor: CGFloat = 2.0
+    
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
     private var frontInput: AVCaptureDeviceInput?
@@ -200,6 +234,31 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     private var frontVideoDataOutput: AVCaptureVideoDataOutput?
     private var backVideoDataOutput: AVCaptureVideoDataOutput?
     
+    private var backCameraType: AVCaptureDevice.DeviceType?
+    
+    private func getBestFrontCamera() -> AVCaptureDevice? {
+        return AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+    }
+    
+    private func getBestBackCamera() -> AVCaptureDevice? {
+        if let ultraWideCamera = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) {
+            backCameraType = .builtInUltraWideCamera
+            backInitialZoom = currentBackZoom.zoomFactor 
+            print("Using ultra-wide camera with initial zoom: \(currentBackZoom.displayText)")
+            return ultraWideCamera
+        }
+        
+        if let wideCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+            backCameraType = .builtInWideAngleCamera
+            backInitialZoom = currentBackZoom.zoomFactor 
+            print("Using wide-angle camera with initial zoom: \(currentBackZoom.displayText)")
+            return wideCamera
+        }
+        
+        print("No back camera available")
+        return nil
+    }
+    
     func preWarmWriter() {
         guard !hasPreWarmedWriter else { return }
         hasPreWarmedWriter = true
@@ -238,6 +297,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             DispatchQueue.main.async {
                 previewView.setupPreviewLayers(with: self.session)
                 self.isPreviewReady = true
+                self.applyInitialZoomSettings()
                 self.preWarmWriter()
             }
         }
@@ -387,6 +447,8 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
                 self.frontVideoDataOutput?.setSampleBufferDelegate(self, queue: self.sessionQueue)
                 self.backVideoDataOutput?.setSampleBufferDelegate(self, queue: self.sessionQueue)
                 
+                self.applyInitialZoomSettings()
+                
                 DispatchQueue.global(qos: .utility).async {
                     self.preWarmWriter()
                 }
@@ -397,7 +459,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     }
     
     private func preWarmCameraDevices() {
-        if let front = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+        if let front = getBestFrontCamera() {
             do {
                 try front.lockForConfiguration()
                 front.unlockForConfiguration()
@@ -406,7 +468,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             }
         }
         
-        if let back = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+        if let back = getBestBackCamera() {
             do {
                 try back.lockForConfiguration()
                 back.unlockForConfiguration()
@@ -421,31 +483,43 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         defer { session.commitConfiguration() }
         
         do {
-            if let front = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+            if let front = getBestFrontCamera() {
                 let frontDeviceInput = try AVCaptureDeviceInput(device: front)
                 self.frontCamera = front
                 self.frontInput = frontDeviceInput
                 
                 if self.session.canAddInput(frontDeviceInput) {
                     self.session.addInputWithNoConnections(frontDeviceInput)
+                } else {
+                    print("Failed to add front camera input")
                 }
+            } else {
+                print("No front camera available")
             }
             
-            if let back = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+            if let back = getBestBackCamera() {
                 let backDeviceInput = try AVCaptureDeviceInput(device: back)
                 self.backCamera = back
                 self.backInput = backDeviceInput
                 
                 if self.session.canAddInput(backDeviceInput) {
                     self.session.addInputWithNoConnections(backDeviceInput)
+                } else {
+                    print("Failed to add back camera input")
                 }
+            } else {
+                print("No back camera available")
             }
             
             if let audioDevice = AVCaptureDevice.default(for: .audio) {
                 let audioInput = try AVCaptureDeviceInput(device: audioDevice)
                 if self.session.canAddInput(audioInput) {
                     self.session.addInputWithNoConnections(audioInput)
+                } else {
+                    print("Failed to add audio input")
                 }
+            } else {
+                print("No audio device available")
             }
         } catch {
             print("Camera setup error: \(error)")
@@ -626,7 +700,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         cameraSwitchTimestamps.removeAll()
         recordingStartTime = CFAbsoluteTimeGetCurrent()
         if cameraLayoutMode == .frontOnly {
-            initialCameraPosition = previewView?.activeCameraInFrontOnlyMode ?? .front
+            initialCameraPosition = activeCameraInFrontOnlyMode
         } else {
             initialCameraPosition = .front 
         }
@@ -955,7 +1029,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         
          do {
              try device.lockForConfiguration()
-             let maxZoom = device.activeFormat.videoMaxZoomFactor
+             let maxZoom = min(device.activeFormat.videoMaxZoomFactor, 42.0)
              let clampedFactor = min(max(factor, 1.0), maxZoom)
             
              if position == .front {
@@ -964,6 +1038,15 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
              } else {
                  backZoomFactor = clampedFactor
                  device.videoZoomFactor = clampedFactor
+                 exactBackZoomFactor = clampedFactor
+                 
+                 if clampedFactor <= 1.0 {
+                     currentBackZoom = .oneX
+                 } else {
+                     currentBackZoom = .twoX
+                //  } else {
+                //      currentBackZoom = .threeX
+                 }
              }
             
              device.unlockForConfiguration()
@@ -1057,6 +1140,8 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     }
     
     func flipCameraInFrontOnlyMode() {
+        print("flipCameraInFrontOnlyMode called - current mode: \(cameraLayoutMode), current active camera: \(activeCameraInFrontOnlyMode)")
+        
         if isRecording && isFlashOn {
             if getCurrentActiveCameraPosition() == .front {
                 turnFlashOn()
@@ -1064,14 +1149,82 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
                 turnFlashOff()
             }
         }
+        
+        activeCameraInFrontOnlyMode = activeCameraInFrontOnlyMode == .front ? .back : .front
+        print("Camera flipped to: \(activeCameraInFrontOnlyMode)")
+        
+        
         previewView?.flipCameraInFrontOnlyMode()
     }
     
     func getCurrentActiveCameraPosition() -> AVCaptureDevice.Position {
         if cameraLayoutMode == .frontOnly {
-            return previewView?.activeCameraInFrontOnlyMode ?? initialCameraPosition
+            return activeCameraInFrontOnlyMode
         } else {
             return .back 
+        }
+    }
+    
+    private func applyInitialZoomSettings() {
+        if let frontCamera = frontCamera {
+            do {
+                try frontCamera.lockForConfiguration()
+                frontCamera.videoZoomFactor = frontInitialZoom
+                frontZoomFactor = frontInitialZoom
+                frontCamera.unlockForConfiguration()
+            } catch {
+                print("Failed to set front camera initial zoom: \(error)")
+            }
+        }
+        
+        if let backCamera = backCamera {
+            do {
+                try backCamera.lockForConfiguration()
+                backCamera.videoZoomFactor = backInitialZoom
+                backZoomFactor = backInitialZoom
+                exactBackZoomFactor = backInitialZoom
+                backCamera.unlockForConfiguration()
+            } catch {
+                print("Failed to set back camera initial zoom: \(error)")
+            }
+        }
+    }
+    
+    func getCurrentBackCameraType() -> AVCaptureDevice.DeviceType? {
+        return backCameraType
+    }
+    
+    func isUsingUltraWideCamera() -> Bool {
+        return backCameraType == .builtInUltraWideCamera
+    }
+    
+    func cycleBackCameraZoom() {
+        guard let backCamera = backCamera else { return }
+        
+        let maxZoom = backCamera.activeFormat.videoMaxZoomFactor
+        
+        var nextZoom = currentBackZoom.next
+        while nextZoom.zoomFactor > maxZoom && nextZoom != currentBackZoom {
+            nextZoom = nextZoom.next
+        }
+        
+        currentBackZoom = nextZoom
+        exactBackZoomFactor = currentBackZoom.zoomFactor
+        setZoomFactor(currentBackZoom.zoomFactor, forCamera: .back)
+        print("Back camera zoom changed to: \(currentBackZoom.displayText)")
+    }
+    
+    func getMaxBackCameraZoom() -> CGFloat {
+        guard let backCamera = backCamera else { return 1.0 }
+        return min(backCamera.activeFormat.videoMaxZoomFactor, 42.0)
+    }
+    
+    func getBackZoomDisplayText() -> String {
+        let tolerance: CGFloat = 0.1
+        if abs(exactBackZoomFactor - currentBackZoom.zoomFactor) < tolerance {
+            return currentBackZoom.displayText
+        } else {
+            return String(format: "%.1fx", exactBackZoomFactor / 2)
         }
     }
 }

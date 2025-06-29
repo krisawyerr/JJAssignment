@@ -41,7 +41,6 @@ class CameraPreviewUIView: UIView {
 
     private weak var cameraController: CameraController?
     var cameraLayoutMode: CameraController.CameraLayoutMode = .topBottom
-    var activeCameraInFrontOnlyMode: AVCaptureDevice.Position = .front
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -110,7 +109,7 @@ class CameraPreviewUIView: UIView {
         let position: AVCaptureDevice.Position
         
         if cameraLayoutMode == .frontOnly {
-            position = activeCameraInFrontOnlyMode
+            position = cameraController.activeCameraInFrontOnlyMode
         } else if cameraLayoutMode == .topBottom {
             position = location.y < bounds.height / 2 ? .front : .back
         } else {
@@ -150,7 +149,7 @@ class CameraPreviewUIView: UIView {
             let aspectRatio: CGFloat = 9.0 / 16.0
             
             if cameraLayoutMode == .frontOnly {
-                if activeCameraInFrontOnlyMode == .front {
+                if cameraController?.activeCameraInFrontOnlyMode == .front {
                     frontLayer.frame = bounds
                     backLayer.isHidden = true
                     frontLayer.isHidden = false
@@ -192,13 +191,13 @@ class CameraPreviewUIView: UIView {
         self.cameraLayoutMode = cameraLayoutMode
         
         if cameraLayoutMode == .frontOnly {
-            activeCameraInFrontOnlyMode = .front
+            cameraController?.activeCameraInFrontOnlyMode = .front
         }
         
         if let frontLayer = frontPreviewLayer,
            let backLayer = backPreviewLayer {
             if cameraLayoutMode == .frontOnly {
-                if activeCameraInFrontOnlyMode == .front {
+                if cameraController?.activeCameraInFrontOnlyMode == .front {
                     frontLayer.isHidden = false
                     backLayer.isHidden = true
                 } else {
@@ -220,10 +219,7 @@ class CameraPreviewUIView: UIView {
     func flipCameraInFrontOnlyMode() {
         guard cameraLayoutMode == .frontOnly else { return }
         
-        activeCameraInFrontOnlyMode = activeCameraInFrontOnlyMode == .front ? .back : .front
-        print("Switched to \(activeCameraInFrontOnlyMode == .front ? "front" : "back") camera in front-only mode")
-        
-        cameraController?.recordCameraSwitch()
+        print("Switched to \(cameraController?.activeCameraInFrontOnlyMode == .front ? "front" : "back") camera in front-only mode")
         
         setNeedsLayout()
         layoutIfNeeded()

@@ -70,6 +70,7 @@ struct CreateView: View {
                     topControlsView
                     Spacer()
                     Spacer()
+                    zoomSelectionView
                     recordingButtonView
                 }
             }
@@ -142,6 +143,58 @@ struct CreateView: View {
         }
     }
     
+    private var zoomSelectionView: some View {
+        Group {
+            if cameraController.getCurrentActiveCameraPosition() == .back {
+                HStack(spacing: 8) {
+                    Button(action: {
+                        triggerHaptic(.light)
+                        cameraController.setZoomFactor(1.0, forCamera: .back)
+                    }) {
+                        Text(cameraController.exactBackZoomFactor / 2 < 1.0 ? String(format: "%.1fx", cameraController.exactBackZoomFactor / 2) : "0.5x")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(cameraController.exactBackZoomFactor / 2 < 1.0 ? .white : .white.opacity(0.6))
+                            .frame(width: 40, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(cameraController.exactBackZoomFactor / 2 < 1.0 ? Color.black.opacity(0.5) : Color.clear)
+                            )
+                    }
+                    
+                    Button(action: {
+                        triggerHaptic(.light)
+                        cameraController.setZoomFactor(2.0, forCamera: .back)
+                    }) {
+                        Text(cameraController.exactBackZoomFactor / 2 >= 1.0 && cameraController.exactBackZoomFactor / 2 < 2.0 ? String(format: "%.1fx", cameraController.exactBackZoomFactor / 2) : "1.0x")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(cameraController.exactBackZoomFactor / 2 >= 1.0 && cameraController.exactBackZoomFactor / 2 < 2.0 ? .white : .white.opacity(0.6))
+                            .frame(width: 40, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(cameraController.exactBackZoomFactor / 2 >= 1.0 && cameraController.exactBackZoomFactor / 2 < 2.0 ? Color.black.opacity(0.5) : Color.clear)
+                            )
+                    }
+
+                    Button(action: {
+                        triggerHaptic(.light)
+                        cameraController.setZoomFactor(4.0, forCamera: .back)
+                    }) {
+                        Text(cameraController.exactBackZoomFactor / 2 >= 2.0 ? String(format: "%.1fx", cameraController.exactBackZoomFactor / 2) : "2.0x")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(cameraController.exactBackZoomFactor / 2 >= 2.0 ? .white : .white.opacity(0.6))
+                            .frame(width: 40, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(cameraController.exactBackZoomFactor / 2 >= 2.0 ? Color.black.opacity(0.5) : Color.clear)
+                            )
+                    }
+                }
+                .padding(.bottom, 10)
+                .animation(.easeInOut(duration: 0.2), value: cameraController.exactBackZoomFactor)
+            }
+        }
+    }
+    
     private var recordingButtonView: some View {
         ZStack {
             Color.clear
@@ -150,7 +203,7 @@ struct CreateView: View {
             
             jellyfishShapeView
         }
-        .padding(.bottom, 50)
+        .padding(.bottom, 20)
         .simultaneousGesture(recordingGesture)
     }
     
