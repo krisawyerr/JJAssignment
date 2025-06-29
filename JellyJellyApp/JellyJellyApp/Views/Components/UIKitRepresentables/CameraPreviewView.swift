@@ -149,7 +149,9 @@ class CameraPreviewUIView: UIView {
             let aspectRatio: CGFloat = 9.0 / 16.0
             
             if cameraLayoutMode == .frontOnly {
-                if cameraController?.activeCameraInFrontOnlyMode == .front {
+                let activeCamera = cameraController?.activeCameraInFrontOnlyMode ?? .front
+                
+                if activeCamera == .front {
                     frontLayer.frame = bounds
                     backLayer.isHidden = true
                     frontLayer.isHidden = false
@@ -190,10 +192,6 @@ class CameraPreviewUIView: UIView {
         print("Setting layout mode to: \(cameraLayoutMode == .frontOnly ? "front-only" : (cameraLayoutMode == .topBottom ? "top-bottom" : "side-by-side"))")
         self.cameraLayoutMode = cameraLayoutMode
         
-        if cameraLayoutMode == .frontOnly {
-            cameraController?.activeCameraInFrontOnlyMode = .front
-        }
-        
         if let frontLayer = frontPreviewLayer,
            let backLayer = backPreviewLayer {
             if cameraLayoutMode == .frontOnly {
@@ -217,12 +215,14 @@ class CameraPreviewUIView: UIView {
     }
     
     func flipCameraInFrontOnlyMode() {
-        guard cameraLayoutMode == .frontOnly else { return }
-        
-        print("Switched to \(cameraController?.activeCameraInFrontOnlyMode == .front ? "front" : "back") camera in front-only mode")
-        
-        setNeedsLayout()
-        layoutIfNeeded()
+        guard cameraLayoutMode == .frontOnly else { 
+            return 
+        }
+                
+        DispatchQueue.main.async { [weak self] in
+            self?.setNeedsLayout()
+            self?.layoutIfNeeded()
+        }
     }
 }
 

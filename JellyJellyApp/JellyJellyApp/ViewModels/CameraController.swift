@@ -1213,9 +1213,12 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             }
         }
         
+        let previousCamera = activeCameraInFrontOnlyMode
         activeCameraInFrontOnlyMode = activeCameraInFrontOnlyMode == .front ? .back : .front
-        print("Camera flipped to: \(activeCameraInFrontOnlyMode)")
         
+        if isRecording {
+            recordCameraSwitch()
+        }
         
         previewView?.flipCameraInFrontOnlyMode()
     }

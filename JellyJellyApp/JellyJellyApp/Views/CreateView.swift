@@ -62,7 +62,9 @@ struct CreateView: View {
                     )
                     .onTapGesture(count: 2) {
                         if cameraController.cameraLayoutMode == .frontOnly {
-                            cameraController.flipCameraInFrontOnlyMode()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                cameraController.flipCameraInFrontOnlyMode()
+                            }
                         }
                     }
                 
