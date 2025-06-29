@@ -752,7 +752,6 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         
         do {
             try configureAudioSessionForFrontCameraRecording()
-            logCurrentAudioSessionSettings()
         } catch {
             print("Failed to configure audio session for front camera recording: \(error)")
         }
@@ -776,7 +775,6 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
             self.isRecording = true
         }
         startTimer()
-        startAudioLevelMonitoring()
     }
     
     func stopRecording() {
@@ -791,7 +789,6 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         } catch {
             print("Failed to deactivate audio session: \(error)")
         }
-        stopAudioLevelMonitoring()
         DispatchQueue.main.async {
             self.isRecording = false
         }
