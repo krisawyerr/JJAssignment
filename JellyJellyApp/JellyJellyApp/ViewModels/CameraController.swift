@@ -158,6 +158,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     @Published var frontAudioLevel: CGFloat = 0.0
     private var audioLevelTimer: Timer?
     
+    private var lastAppendedVideoTime: CMTime?
     
     private func configureAudioSessionForFrontCameraRecording() throws {
         let session = AVAudioSession.sharedInstance()
@@ -728,6 +729,8 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         backFrameBuffer.removeAll()
         frameBufferLock.unlock()
         
+        lastAppendedVideoTime = nil
+        
         if let outputURL = outputURL {
             try? FileManager.default.removeItem(at: outputURL)
         }
@@ -737,6 +740,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         guard let outputURL = outputURL else { return }
         
         cleanupWriter()
+        lastAppendedVideoTime = nil
         
         let size = CGSize(width: 720, height: 1280)
         assetWriter = try? AVAssetWriter(outputURL: outputURL, fileType: .mp4)
@@ -910,7 +914,7 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
     }
     
     private func compositeAndWrite(frontBuffer: CMSampleBuffer, backBuffer: CMSampleBuffer, at time: CMTime) {
-        guard let assetWriter = assetWriter, let videoInput = videoInput, let pixelBufferAdaptor = pixelBufferAdaptor, videoInput.isReadyForMoreMediaData else { return }
+        guard let assetWriter = assetWriter, let videoInput = videoInput, let pixelBufferAdaptor = pixelBufferAdaptor, videoInput.isReadyForMoreMediaData, assetWriter.status == .writing else { return }
         guard let frontPixelBuffer = CMSampleBufferGetImageBuffer(frontBuffer), let backPixelBuffer = CMSampleBufferGetImageBuffer(backBuffer) else { return }
         
         if assetWriter.status == .unknown {
@@ -977,8 +981,17 @@ class CameraController: NSObject, ObservableObject, AVCaptureAudioDataOutputSamp
         CVPixelBufferCreate(kCFAllocatorDefault, Int(size.width), Int(size.height), kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
         if let pixelBuffer = pixelBuffer {
             ciContext.render(outputImage, to: pixelBuffer)
-            pixelBufferAdaptor.append(pixelBuffer, withPresentationTime: time)
-            frameCount += 1
+            if let lastTime = lastAppendedVideoTime, time <= lastTime {
+                print("Skipping frame: non-increasing presentation time (last: \(lastTime.seconds), current: \(time.seconds))")
+                return
+            }
+            let success = pixelBufferAdaptor.append(pixelBuffer, withPresentationTime: time)
+            if !success {
+                print("Failed to append pixel buffer at time: \(time.seconds)")
+            } else {
+                lastAppendedVideoTime = time
+                frameCount += 1
+            }
         }
     }
     

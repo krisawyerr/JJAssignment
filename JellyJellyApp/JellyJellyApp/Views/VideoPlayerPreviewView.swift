@@ -16,6 +16,7 @@ struct VideoPlayerPreviewView: View {
     @State private var watermarkedVideoURL: URL?
     @State private var isWatermarkingInProgress = false
     @Environment(\.managedObjectContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     
     init(mergedVideoURL: URL, onSave: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.mergedVideoURL = mergedVideoURL
@@ -138,6 +139,11 @@ struct VideoPlayerPreviewView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Please allow access to your photo library to save videos.")
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                player.play()
+            }
         }
     }
     
