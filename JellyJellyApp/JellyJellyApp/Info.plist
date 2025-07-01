@@ -2,6 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key></key>
+	<string></string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+        <string>instagram</string>
+        <string>instagram-stories</string>
+        <string>instagram-camera</string>
+        <string>tiktok</string>
+        <string>snssdk1233</string>
+        <string>snssdk1180</string>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Ranchers-Regular.ttf</string>

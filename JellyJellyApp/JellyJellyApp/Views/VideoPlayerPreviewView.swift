@@ -15,6 +15,10 @@ struct VideoPlayerPreviewView: View {
     @State private var showPhotoLibraryPermissionAlert = false
     @State private var watermarkedVideoURL: URL?
     @State private var isWatermarkingInProgress = false
+    @State private var showShareSheet = false
+    @State private var isSharingToInstagram = false
+    @State private var showInstagramError = false
+    @State private var instagramErrorMessage = ""
     @Environment(\.managedObjectContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     
@@ -63,6 +67,39 @@ struct VideoPlayerPreviewView: View {
                         Spacer()
                     }
                     .padding()
+                    
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 20) {
+                            Spacer()
+                            VStack {
+                                Button(action: { showShareSheet = true }) {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.white)
+                                        .frame(width: 50, height: 50)
+                                        .background(Color("JellyPrimary"))
+                                        .clipShape(Circle())
+                                }
+                                Button(action: handleInstagramShareButton) {
+                                    Image("instagram")
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 24, height: 24)
+                                        .padding(13)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color.purple, Color.pink],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .clipShape(Circle())
+                                }
+                            }
+                        }
+                    }
+                    .padding()
                 }
                 
                 VStack {
@@ -75,6 +112,32 @@ struct VideoPlayerPreviewView: View {
                                 .background(Color.black.opacity(0.5))
                                 .clipShape(Circle())
                         }
+                                                
+//                        if watermarkedVideoURL != nil {
+//                            Button(action: { showShareSheet = true }) {
+//                                Image(systemName: "square.and.arrow.up")
+//                                    .font(.system(size: 24))
+//                                    .foregroundColor(.white)
+//                                    .frame(width: 50, height: 50)
+//                                    .background(Color("JellyPrimary"))
+//                                    .clipShape(Circle())
+//                            }
+//                            
+//                            Button(action: shareToSocialMedia) {
+//                                Image(systemName: "camera")
+//                                    .font(.system(size: 24))
+//                                    .foregroundColor(.white)
+//                                    .frame(width: 50, height: 50)
+//                                    .background(
+//                                        LinearGradient(
+//                                            colors: [Color.purple, Color.pink],
+//                                            startPoint: .topLeading,
+//                                            endPoint: .bottomTrailing
+//                                        )
+//                                    )
+//                                    .clipShape(Circle())
+//                            }
+//                        }
                         
                         Button(action: onSave) {
                             Text("Save Jelly")
@@ -95,6 +158,7 @@ struct VideoPlayerPreviewView: View {
                                 .background(Color("JellyPrimary"))
                                 .cornerRadius(22)
                         }
+
                     }
                 }
             }
@@ -104,6 +168,14 @@ struct VideoPlayerPreviewView: View {
         .overlay {
             if isSavingVideo {
                 ProgressView("Saving video...")
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .shadow(radius: 10)
+            }
+            
+            if isSharingToInstagram {
+                ProgressView("Sharing to social media...")
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
@@ -144,6 +216,16 @@ struct VideoPlayerPreviewView: View {
             if newPhase == .active {
                 player.play()
             }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let watermarkedURL = watermarkedVideoURL {
+                ActivityView(activityItems: [watermarkedURL])
+            }
+        }
+        .alert("Social Media Sharing Error", isPresented: $showInstagramError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(instagramErrorMessage)
         }
     }
     
@@ -243,6 +325,49 @@ struct VideoPlayerPreviewView: View {
                 @unknown default:
                     self.isSavingVideo = false
                     break
+                }
+            }
+        }
+    }
+    
+    private func shareToSocialMedia() {
+        guard let watermarkedURL = watermarkedVideoURL else {
+            instagramErrorMessage = "No watermarked video available"
+            showInstagramError = true
+            return
+        }
+        
+        isSharingToInstagram = true
+        
+        SocialSharingService.shared.shareToSocialMediaUniversal(videoURL: watermarkedURL) { success, message in
+            DispatchQueue.main.async {
+                self.isSharingToInstagram = false
+                
+                if success {
+                } else {
+                    self.instagramErrorMessage = message
+                    self.showInstagramError = true
+                }
+            }
+        }
+    }
+    
+    private func handleInstagramShareButton() {
+        isSharingToInstagram = true
+        if let watermarkedURL = watermarkedVideoURL, FileManager.default.fileExists(atPath: watermarkedURL.path) {
+            shareToSocialMedia()
+        } else {
+            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+                let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", mergedVideoURL.absoluteString)
+                if let video = try? context.fetch(fetchRequest).first,
+                   let watermarkedURLString = video.watermarkedVideoURL,
+                   let watermarkedURL = URL(string: watermarkedURLString),
+                   FileManager.default.fileExists(atPath: watermarkedURL.path) {
+                    timer.invalidate()
+                    self.watermarkedVideoURL = watermarkedURL
+                    self.isWatermarkingInProgress = false
+                    self.shareToSocialMedia()
                 }
             }
         }

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import FirebaseCore
+import UIKit
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
@@ -42,13 +43,9 @@ struct JellyJellyAppApp: App {
                 //         .animation(.easeInOut(duration: 0.5), value: appState.cameraController.isPreviewReady)
                 // }
             }
-            // .onAppear {
-            //     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            //         withAnimation(.easeInOut(duration: 0.5)) {
-            //             isLoading = false
-            //         }
-            //     }
-            // }
+            .onAppear {
+                prewarmShareSheet()
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             print("Scene phase changed to: \(newPhase)")
@@ -71,6 +68,23 @@ struct JellyJellyAppApp: App {
             @unknown default:
                 break
             }
+        }
+    }
+}
+
+func prewarmShareSheet() {
+    guard let url = Bundle.main.url(forResource: "heart", withExtension: "svg") else { return }
+    let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+
+    let window = UIWindow(frame: UIScreen.main.bounds)
+    window.windowLevel = .alert + 1
+    window.isHidden = false
+    let dummyVC = UIViewController()
+    window.rootViewController = dummyVC
+
+    dummyVC.present(activityVC, animated: false) {
+        activityVC.dismiss(animated: false) {
+            window.isHidden = true
         }
     }
 }
