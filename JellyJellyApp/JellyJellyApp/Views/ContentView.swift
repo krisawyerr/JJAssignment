@@ -33,7 +33,7 @@ struct ContentView: View {
                     .tag(Tab.home)
                     .background(Color("Background"))
 
-                CreateView(cameraController: appState.cameraController, selectedTab: $appState.selectedTab, isProcessingVideo: $isProcessingVideo)
+                CreateView(cameraController: appState.cameraState.cameraController, selectedTab: $appState.selectedTab, isProcessingVideo: $isProcessingVideo)
                     .environmentObject(appState)
                     .tabItem {
                         Image(systemName: "plus.circle.fill")
@@ -133,9 +133,9 @@ struct ContentView: View {
     private func handleTabChange(_ newTab: Tab) {
         switch newTab {
         case .create:
-            appState.cameraController.resumeCamera()
+            appState.cameraState.cameraController.resumeCamera()
         case .home, .library:
-            appState.cameraController.pauseCamera()
+            appState.cameraState.cameraController.pauseCamera()
         }
     }
 }

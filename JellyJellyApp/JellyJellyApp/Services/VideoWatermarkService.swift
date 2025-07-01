@@ -23,7 +23,7 @@ class VideoWatermarkService {
         }
     }
     
-    func addWatermarkToVideoAsync(inputURL: URL, outputURL: URL) async throws -> URL {
+    private func addWatermarkToVideoAsync(inputURL: URL, outputURL: URL) async throws -> URL {
         let asset = AVURLAsset(url: inputURL)
         
         let composition = AVMutableComposition()

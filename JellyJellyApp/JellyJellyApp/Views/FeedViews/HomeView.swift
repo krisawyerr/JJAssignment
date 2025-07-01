@@ -18,11 +18,11 @@ struct HomeView: View {
     var body: some View {
         VStack {
             Group {
-                if appState.shareableItems.isEmpty {
+                if appState.shareableItemsState.shareableItems.isEmpty {
                     LoadingView(text: "jellies incoming...")
                 } else {
                     GenericScrollerView(
-                        videoItems: appState.shareableItems,
+                        videoItems: appState.shareableItemsState.shareableItems,
                         currentIndex: 0,
                         navigationPath: $navigationPath,
                         selectedTab: $selectedTab

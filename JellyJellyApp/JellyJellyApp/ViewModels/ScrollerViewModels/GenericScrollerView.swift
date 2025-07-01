@@ -20,11 +20,11 @@ struct GenericScrollerView<T: VideoPlayable>: View {
     
     private var playerStore: GenericPlayerManagerStore<T> {
         if T.self == ShareableItem.self {
-            return appState.shareablePlayerStore as! GenericPlayerManagerStore<T>
+            return appState.videoPlaybackState.shareablePlayerStore as! GenericPlayerManagerStore<T>
         } else if T.self == RecordedVideo.self {
-            return appState.recordedPlayerStore as! GenericPlayerManagerStore<T>
+            return appState.videoPlaybackState.recordedPlayerStore as! GenericPlayerManagerStore<T>
         } else if T.self == LikedItem.self {
-            return appState.likedPlayerStore as! GenericPlayerManagerStore<T>
+            return appState.videoPlaybackState.likedPlayerStore as! GenericPlayerManagerStore<T>
         }
         fatalError("Unsupported video type")
     }
@@ -67,11 +67,11 @@ struct GenericScrollerView<T: VideoPlayable>: View {
         }
         .onChange(of: currentIndex) { _, newIndex in
             if T.self == ShareableItem.self {
-                appState.updateCurrentVideoIndex(newIndex, type: .shareable)
+                appState.videoPlaybackState.updateCurrentVideoIndex(newIndex, type: .shareable)
             } else if T.self == LikedItem.self {
-                appState.updateCurrentVideoIndex(newIndex, type: .liked)
+                appState.videoPlaybackState.updateCurrentVideoIndex(newIndex, type: .liked)
             } else if T.self == RecordedVideo.self {
-                appState.updateCurrentVideoIndex(newIndex, type: .recorded)
+                appState.videoPlaybackState.updateCurrentVideoIndex(newIndex, type: .recorded)
             }
             preloadAdjacentVideos(around: newIndex)
         }
@@ -111,11 +111,11 @@ struct GenericScrollerView<T: VideoPlayable>: View {
         manager.play()
         
         if T.self == ShareableItem.self {
-            appState.updateCurrentVideoIndex(currentIndex, type: .shareable)
+            appState.videoPlaybackState.updateCurrentVideoIndex(currentIndex, type: .shareable)
         } else if T.self == LikedItem.self {
-            appState.updateCurrentVideoIndex(currentIndex, type: .liked)
+            appState.videoPlaybackState.updateCurrentVideoIndex(currentIndex, type: .liked)
         } else if T.self == RecordedVideo.self {
-            appState.updateCurrentVideoIndex(currentIndex, type: .recorded)
+            appState.videoPlaybackState.updateCurrentVideoIndex(currentIndex, type: .recorded)
         }
         
         if videoItems.count > 1 {

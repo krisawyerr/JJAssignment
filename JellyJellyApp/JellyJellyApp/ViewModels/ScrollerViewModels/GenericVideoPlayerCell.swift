@@ -145,7 +145,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                 playerManager.play()
             }
             if let shareableItem = videoItem as? ShareableItem {
-                isLiked = appState.isItemLiked(shareableItem.id)
+                isLiked = appState.persistenceState.isItemLiked(shareableItem.id)
             }
         }
     }
@@ -156,7 +156,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
         if isLiked {
             handleUnlike(method: method)
         } else if method == "Button" || (method == "Double Tap" && !isLiked) {
-            appState.likeItem(shareableItem)
+            appState.persistenceState.likeItem(shareableItem)
             isLiked = true
         }
         
@@ -173,7 +173,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
         guard method == "Button" else { return }
         
         if let likedItem = videoItem as? LikedItem {
-            let context = appState.viewContext
+            let context = appState.persistenceState.viewContext
             context.delete(likedItem)
             
             do {
@@ -186,7 +186,7 @@ struct GenericVideoPlayerCell<T: VideoPlayable>: View {
                 print("Error removing liked item: \(error)")
             }
         } else if let shareableItem = videoItem as? ShareableItem {
-            appState.likeItem(shareableItem)
+            appState.persistenceState.likeItem(shareableItem)
             isLiked = false
         }
     }

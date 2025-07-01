@@ -339,7 +339,7 @@ struct VideoPlayerPreviewView: View {
         
         isSharingToInstagram = true
         
-        SocialSharingService.shared.shareToSocialMediaUniversal(videoURL: watermarkedURL) { success, message in
+        InstagramSharingService.shared.shareToSocialMediaUniversal(videoURL: watermarkedURL) { success, message in
             DispatchQueue.main.async {
                 self.isSharingToInstagram = false
                 

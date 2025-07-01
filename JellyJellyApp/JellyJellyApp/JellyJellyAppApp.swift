@@ -8,6 +8,7 @@
 import SwiftUI
 import FirebaseCore
 import UIKit
+import CoreData
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
@@ -34,7 +35,7 @@ struct JellyJellyAppApp: App {
             ZStack {
                 ContentView()
                     .environmentObject(appState)
-                    .environment(\.managedObjectContext, appState.viewContext)
+                    .environment(\.managedObjectContext, appState.persistenceState.viewContext)
                 
                 // if isLoading {
                 //     LaunchScreenView()
@@ -49,14 +50,18 @@ struct JellyJellyAppApp: App {
         }
         .onChange(of: scenePhase) { _, newPhase in
             print("Scene phase changed to: \(newPhase)")
-            let cameraController = appState.cameraController
+            let cameraController = appState.cameraState.cameraController
             switch newPhase {
             case .active:
                 if wasInBackground {
                     if appState.selectedTab == .create && !appState.isShowingPreview {
                         cameraController.resumeCamera()
                     }
-                    appState.resumeVideoPlayback()
+                    appState.videoPlaybackState.resumeVideoPlayback(
+                        shareableItems: appState.shareableItemsState.shareableItems,
+                        likedItems: fetchLikedItems(context: appState.persistenceState.viewContext),
+                        recordedItems: fetchRecordedVideos(context: appState.persistenceState.viewContext)
+                    )
                 }
                 wasInBackground = false
             case .inactive:
@@ -64,7 +69,11 @@ struct JellyJellyAppApp: App {
             case .background:
                 wasInBackground = true
                 cameraController.pauseCamera()
-                appState.pauseVideoPlayback()
+                appState.videoPlaybackState.pauseVideoPlayback(
+                    shareableItems: appState.shareableItemsState.shareableItems,
+                    likedItems: fetchLikedItems(context: appState.persistenceState.viewContext),
+                    recordedItems: fetchRecordedVideos(context: appState.persistenceState.viewContext)
+                )
             @unknown default:
                 break
             }
@@ -86,5 +95,28 @@ func prewarmShareSheet() {
         activityVC.dismiss(animated: false) {
             window.isHidden = true
         }
+    }
+}
+
+fileprivate func fetchLikedItems(context: NSManagedObjectContext) -> [LikedItem] {
+    let fetchRequest: NSFetchRequest<LikedItem> = LikedItem.fetchRequest()
+    fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \LikedItem.createdAt, ascending: false)]
+    do {
+        return try context.fetch(fetchRequest)
+    } catch {
+        print("Error fetching liked videos: \(error)")
+        return []
+    }
+}
+
+fileprivate func fetchRecordedVideos(context: NSManagedObjectContext) -> [RecordedVideo] {
+    let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+    fetchRequest.predicate = NSPredicate(format: "saved == YES")
+    fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \RecordedVideo.createdAt, ascending: false)]
+    do {
+        return try context.fetch(fetchRequest)
+    } catch {
+        print("Error fetching recorded videos: \(error)")
+        return []
     }
 }

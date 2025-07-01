@@ -2,22 +2,10 @@ import Foundation
 import Photos
 import UIKit
 
-class SocialSharingService {
-    static let shared = SocialSharingService()
+class InstagramSharingService {
+    static let shared = InstagramSharingService()
     
     private init() {}
-    
-    func shareToSocialMedia(videoURL: URL, completion: @escaping (Result<Void, Error>) -> Void) {
-        saveVideoToPhotos(videoURL: videoURL) { [weak self] result in
-            switch result {
-            case .success:
-                self?.openInstagram()
-                completion(.success(()))
-            case .failure(let error):
-                completion(.failure(error))
-            }
-        }
-    }
     
     func shareToSocialMediaUniversal(videoURL: URL, completion: @escaping (Bool, String) -> Void) {
         saveToPhotos(videoURL: videoURL) { success, message in
@@ -135,51 +123,5 @@ class SocialSharingService {
                 completion(false, "Unable to present sharing interface")
             }
         }
-    }
-    
-    private func saveVideoToPhotos(videoURL: URL, completion: @escaping (Result<Void, Error>) -> Void) {
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            DispatchQueue.main.async {
-                switch status {
-                case .authorized, .limited:
-                    PHPhotoLibrary.shared().performChanges({
-                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
-                    }) { success, error in
-                        DispatchQueue.main.async {
-                            if success {
-                                completion(.success(()))
-                            } else if let error = error {
-                                completion(.failure(error))
-                            } else {
-                                completion(.failure(NSError(domain: "SocialSharing", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save video to photos"])))
-                            }
-                        }
-                    }
-                case .denied, .restricted:
-                    completion(.failure(NSError(domain: "SocialSharing", code: -2, userInfo: [NSLocalizedDescriptionKey: "Photo library access denied"])))
-                case .notDetermined:
-                    completion(.failure(NSError(domain: "SocialSharing", code: -3, userInfo: [NSLocalizedDescriptionKey: "Photo library access not determined"])))
-                @unknown default:
-                    completion(.failure(NSError(domain: "SocialSharing", code: -4, userInfo: [NSLocalizedDescriptionKey: "Unknown photo library access status"])))
-                }
-            }
-        }
-    }
-    
-    private func openInstagram() {
-        if let instagramURL = URL(string: "instagram://app") {
-            if UIApplication.shared.canOpenURL(instagramURL) {
-                UIApplication.shared.open(instagramURL)
-            } else {
-                if let appStoreURL = URL(string: "https://apps.apple.com/app/instagram/id389801252") {
-                    UIApplication.shared.open(appStoreURL)
-                }
-            }
-        }
-    }
-    
-    func canOpenInstagram() -> Bool {
-        guard let instagramURL = URL(string: "instagram://app") else { return false }
-        return UIApplication.shared.canOpenURL(instagramURL)
     }
 } 
