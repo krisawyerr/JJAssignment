@@ -68,11 +68,24 @@ struct JellyJellyAppApp: App {
                     if appState.selectedTab == .create && !appState.isShowingPreview {
                         cameraController.resumeCamera()
                     }
-                    appState.videoPlaybackState.resumeVideoPlayback(
-                        shareableItems: appState.shareableItemsState.shareableItems,
-                        likedItems: fetchLikedItems(context: appState.persistenceState.viewContext),
-                        recordedItems: fetchRecordedVideos(context: appState.persistenceState.viewContext)
-                    )
+                    switch appState.selectedTab {
+                    case .home:
+                        appState.videoPlaybackState.currentVideoType = .shareable
+                        appState.videoPlaybackState.resumeVideoPlayback(
+                            shareableItems: appState.shareableItemsState.shareableItems,
+                            likedItems: [],
+                            recordedItems: []
+                        )
+                    case .library:
+                        appState.videoPlaybackState.currentVideoType = .liked
+                        appState.videoPlaybackState.resumeVideoPlayback(
+                            shareableItems: [],
+                            likedItems: fetchLikedItems(context: appState.persistenceState.viewContext),
+                            recordedItems: []
+                        )
+                    case .create:
+                        break
+                    }
                 }
                 wasInBackground = false
             case .inactive:

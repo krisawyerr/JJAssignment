@@ -64,7 +64,7 @@ struct RecordingPreviewView: View {
                                         .font(.system(size: 24))
                                         .foregroundColor(.white)
                                         .frame(width: 50, height: 50)
-                                        .background(Color("JellyPrimary"))
+                                        .background(Color("JellyPrimary").opacity(0.8))
                                         .clipShape(Circle())
                                 }
                                 Button(action: viewModel.handleInstagramShareButton) {
@@ -75,7 +75,7 @@ struct RecordingPreviewView: View {
                                         .padding(13)
                                         .background(
                                             LinearGradient(
-                                                colors: [Color.purple, Color.pink],
+                                                colors: [Color.purple.opacity(0.8), Color.pink.opacity(0.8)],
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
                                             )
@@ -83,17 +83,13 @@ struct RecordingPreviewView: View {
                                         .clipShape(Circle())
                                 }
                                 Button(action: viewModel.shareToTikTok) {
-                                    Image("instagram")
+                                    Image("tiktok")
                                         .resizable()
                                         .aspectRatio(contentMode: .fit)
                                         .frame(width: 24, height: 24)
                                         .padding(13)
                                         .background(
-                                            LinearGradient(
-                                                colors: [Color.purple, Color.pink],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
+                                            Color.black.opacity(0.8)
                                         )
                                         .clipShape(Circle())
                                 }

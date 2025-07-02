@@ -18,7 +18,7 @@ class InstagramSharingService {
     }
     
     private func saveToPhotos(videoURL: URL, completion: @escaping (Bool, String) -> Void) {
-        PHPhotoLibrary.requestAuthorization { status in
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized else {
                 DispatchQueue.main.async {
                     completion(false, "Photos access denied")

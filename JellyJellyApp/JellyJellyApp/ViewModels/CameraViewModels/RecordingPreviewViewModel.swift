@@ -139,7 +139,6 @@ class RecordingPreviewViewModel: ObservableObject {
     }
 
     func shareToTikTok() {
-        isSharingToInstagram = true
         guard let watermarkedURL = watermarkedVideoURL, FileManager.default.fileExists(atPath: watermarkedURL.path) else {
             instagramErrorMessage = "No watermarked video available"
             showInstagramError = true
@@ -195,6 +194,28 @@ class RecordingPreviewViewModel: ObservableObject {
                     self.watermarkedVideoURL = watermarkedURL
                     self.isWatermarkingInProgress = false
                     self.shareToSocialMedia()
+                }
+            }
+        }
+    }
+    
+    func handleTikTokShareButton() {
+        isSharingToInstagram = true
+        if let watermarkedURL = watermarkedVideoURL, FileManager.default.fileExists(atPath: watermarkedURL.path) {
+            shareToTikTok()
+        } else {
+            instagramTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
+                guard let self = self else { timer.invalidate(); return }
+                let fetchRequest: NSFetchRequest<RecordedVideo> = RecordedVideo.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "mergedVideoURL == %@", self.mergedVideoURL.absoluteString)
+                if let video = try? self.context.fetch(fetchRequest).first,
+                   let watermarkedURLString = video.watermarkedVideoURL,
+                   let watermarkedURL = URL(string: watermarkedURLString),
+                   FileManager.default.fileExists(atPath: watermarkedURL.path) {
+                    timer.invalidate()
+                    self.watermarkedVideoURL = watermarkedURL
+                    self.isWatermarkingInProgress = false
+                    self.shareToTikTok()
                 }
             }
         }
