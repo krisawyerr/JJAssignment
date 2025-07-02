@@ -242,7 +242,7 @@ struct CreateView: View {
     private var previewCover: some View {
         Group {
             if let mergedURL = cameraController.mergedVideoURL {
-                VideoPlayerPreviewView(
+                RecordingPreviewView(
                     mergedVideoURL: mergedURL,
                     onSave: {
                         handleVideoSave(mergedURL)

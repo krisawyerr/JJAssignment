@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		604121F72E14CFEC00CB656B /* TikTokOpenSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = 604121F62E14CFEC00CB656B /* TikTokOpenSDKCore */; };
+		604121F92E14CFEC00CB656B /* TikTokOpenShareSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 604121F82E14CFEC00CB656B /* TikTokOpenShareSDK */; };
 		605DAEBC2DFF87810081455C /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 605DAEBB2DFF87810081455C /* FirebaseStorage */; };
 		605DAEBE2DFF87D10081455C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 605DAEBD2DFF87D10081455C /* FirebaseCore */; };
 		60F4E06C2DF23DA4009D3D7F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 60F4E06B2DF23DA4009D3D7F /* Lottie */; };
@@ -42,6 +44,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				604121F92E14CFEC00CB656B /* TikTokOpenShareSDK in Frameworks */,
+				604121F72E14CFEC00CB656B /* TikTokOpenSDKCore in Frameworks */,
 				60F4E06C2DF23DA4009D3D7F /* Lottie in Frameworks */,
 				605DAEBE2DFF87D10081455C /* FirebaseCore in Frameworks */,
 				605DAEBC2DFF87810081455C /* FirebaseStorage in Frameworks */,
@@ -90,6 +94,8 @@
 				60F4E06B2DF23DA4009D3D7F /* Lottie */,
 				605DAEBB2DFF87810081455C /* FirebaseStorage */,
 				605DAEBD2DFF87D10081455C /* FirebaseCore */,
+				604121F62E14CFEC00CB656B /* TikTokOpenSDKCore */,
+				604121F82E14CFEC00CB656B /* TikTokOpenShareSDK */,
 			);
 			productName = JellyJellyApp;
 			productReference = 600E4EE82DEF42AC00A193CE /* JellyJellyApp.app */;
@@ -122,6 +128,7 @@
 			packageReferences = (
 				60F4E06A2DF23DA4009D3D7F /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				605DAEBA2DFF87810081455C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				604121F52E14CFEC00CB656B /* XCRemoteSwiftPackageReference "tiktok-opensdk-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 600E4EE92DEF42AC00A193CE /* Products */;
@@ -369,6 +376,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		604121F52E14CFEC00CB656B /* XCRemoteSwiftPackageReference "tiktok-opensdk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tiktok/tiktok-opensdk-ios";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		605DAEBA2DFF87810081455C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -388,6 +403,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		604121F62E14CFEC00CB656B /* TikTokOpenSDKCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 604121F52E14CFEC00CB656B /* XCRemoteSwiftPackageReference "tiktok-opensdk-ios" */;
+			productName = TikTokOpenSDKCore;
+		};
+		604121F82E14CFEC00CB656B /* TikTokOpenShareSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 604121F52E14CFEC00CB656B /* XCRemoteSwiftPackageReference "tiktok-opensdk-ios" */;
+			productName = TikTokOpenShareSDK;
+		};
 		605DAEBB2DFF87810081455C /* FirebaseStorage */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 605DAEBA2DFF87810081455C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;

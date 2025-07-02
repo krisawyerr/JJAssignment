@@ -9,8 +9,19 @@ import SwiftUI
 import FirebaseCore
 import UIKit
 import CoreData
+import TikTokOpenSDKCore
 
 class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        return TikTokURLHandler.handleOpenURL(url)
+    }
+
+    func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+        if userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL {
+            return TikTokURLHandler.handleOpenURL(url)
+        }
+        return false
+    }
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
         return true

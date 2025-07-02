@@ -9,9 +9,21 @@
         <string>instagram</string>
         <string>instagram-stories</string>
         <string>instagram-camera</string>
-        <string>tiktok</string>
-        <string>snssdk1233</string>
-        <string>snssdk1180</string>
+        <string>tiktoksharesdkl</string>
+		<string>snssdk1180</string>
+		<string>snssdk1233</string>
+	</array>
+	<key>TikTokClientKey</key>
+	<string>sbawmvhj0kash9dhnj</string>
+
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>sbawmvhj0kash9dhnj</string>
+			</array>
+		</dict>
 	</array>
 	<key>UIAppFonts</key>
 	<array>
