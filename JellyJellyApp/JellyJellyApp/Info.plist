@@ -4,18 +4,6 @@
 <dict>
 	<key></key>
 	<string></string>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-        <string>instagram</string>
-        <string>instagram-stories</string>
-        <string>instagram-camera</string>
-        <string>tiktoksharesdkl</string>
-		<string>snssdk1180</string>
-		<string>snssdk1233</string>
-	</array>
-	<key>TikTokClientKey</key>
-	<string>sbawmvhj0kash9dhnj</string>
-
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -25,6 +13,17 @@
 			</array>
 		</dict>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram</string>
+		<string>instagram-stories</string>
+		<string>instagram-camera</string>
+		<string>tiktoksharesdkl</string>
+		<string>snssdk1180</string>
+		<string>snssdk1233</string>
+	</array>
+	<key>TikTokClientKey</key>
+	<string>sbawmvhj0kash9dhnj</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Ranchers-Regular.ttf</string>
